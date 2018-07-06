@@ -12,6 +12,19 @@ using std::max;
   (assertNearHelper(actual,expected,tolerance,__FILE__,__LINE__))
 
 
+
+static void addDeriv(const float &,float)
+{
+  // Nothing to do if we are adding a derivative to a constant.
+}
+
+
+static float evaluate(float arg)
+{
+  return arg;
+}
+
+
 namespace {
 struct DualFloat {
   float value;
@@ -374,6 +387,20 @@ static float differenceBetween(const FloatMat33 &a,const FloatMat33 &b)
 
 
 template <typename Function>
+static float finiteDeriv(Function f,float &v)
+{
+  float h = 1e-3;
+  float old_value = v;
+  v = old_value - h;
+  float value1 = f();
+  v = old_value + h;
+  float value2 = f();
+  v = old_value;
+  return (value2-value1)/(2*h);
+}
+
+
+template <typename Function>
 static FloatMat33 finiteDeriv(Function f,FloatMat33 &m)
 {
   FloatMat33 result = mat33All(0);
@@ -401,20 +428,6 @@ static float differenceBetween(const FloatVector &a,const FloatVector &b)
   float dz = differenceBetween(a.z, b.z);
 
   return max(dx,dy,dz);
-}
-
-
-template <typename Function>
-static float finiteDeriv(Function f,float &v)
-{
-  float h = 1e-3;
-  float old_value = v;
-  v = old_value - h;
-  float value1 = f();
-  v = old_value + h;
-  float value2 = f();
-  v = old_value;
-  return (value2-value1)/(2*h);
 }
 
 
@@ -631,6 +644,24 @@ static FloatMat33 mat33Identity()
 }
 
 
+namespace {
+template <typename X,typename Y,typename Z>
+struct VectorExpr {
+  X x;
+  Y y;
+  Z z;
+};
+}
+
+
+template <typename A,typename B,typename C>
+static VectorExpr<A,B,C> vector(const A& a,const B& b,const C& c)
+{
+  return {a,b,c};
+}
+
+
+namespace tests {
 static void testAddOperatorDeriv()
 {
   float av = 5;
@@ -673,6 +704,40 @@ static void testDot()
   FloatVector fdv2 = finiteDeriv(f,v2);
   assertNear(dv1,fdv1,1e-4);
   assertNear(dv2,fdv2,1e-4);
+}
+
+
+namespace {
+template <typename Expr>
+struct ExprVar {
+  Expr expr;
+};
+}
+
+
+template <typename Expr>
+static ExprVar<Expr> var(const Expr &expr)
+{
+  return {expr};
+}
+
+
+template <typename Expr>
+static void addDeriv(ExprVar<Expr> &e,float deriv)
+{
+  addDeriv(e.expr,deriv);
+}
+
+
+static void testDot2()
+{
+  float dv = 0;
+  DualFloat v{3,dv};
+  auto a = vector(2,v,4);
+  auto b = vector(5,6,7);
+  auto e = var(dot(a,b));
+  addDeriv(e,1);
+  assertNear(dv,6.0f,1e-4);
 }
 
 
@@ -803,18 +868,20 @@ static void testMatInvDeriv()
     }
   }
 }
+}
 
 
 int main()
 {
-  testAddOperatorDeriv();
-  testMultiplyDeriv();
-  testDot();
-  testMatTranspose();
-  testMat33Inv();
-  testMat33DivDeriv();
-  testCofactorDeriv();
-  testMat33CofactorMatrixDeriv();
-  testDeterminantDeriv();
-  testMatInvDeriv();
+  tests::testAddOperatorDeriv();
+  tests::testMultiplyDeriv();
+  tests::testDot();
+  tests::testDot2();
+  tests::testMatTranspose();
+  tests::testMat33Inv();
+  tests::testMat33DivDeriv();
+  tests::testCofactorDeriv();
+  tests::testMat33CofactorMatrixDeriv();
+  tests::testDeterminantDeriv();
+  tests::testMatInvDeriv();
 }

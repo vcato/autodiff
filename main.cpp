@@ -748,6 +748,26 @@ template <typename Expr> struct Evaluator;
 
 namespace {
 template <>
+struct Evaluator<DualFloat> {
+  DualFloat expr;
+
+  Evaluator(const DualFloat &arg)
+  : expr(arg)
+  {
+  }
+
+  float value() const { return expr.value; }
+
+  void addDeriv(float deriv) const
+  {
+    expr.deriv += deriv;
+  }
+};
+}
+
+
+namespace {
+template <>
 struct Evaluator<Mat33<DualFloat>> {
   Mat33<DualFloat> m_expr;
   FloatMat33 m_value;
@@ -887,6 +907,22 @@ struct Evaluator<Mat33Div<A,B>> {
   : a_eval(expr.a),
     b_eval(expr.b)
   {
+  }
+
+  FloatMat33 value() const
+  {
+    return a_eval.value() / b_eval.value();
+  }
+
+  void addDeriv(const FloatMat33 &deriv)
+  {
+    FloatMat33 a = a_eval.value();
+    FloatMat33 da = mat33All(0);
+    float b = b_eval.value();
+    float db = 0;
+    ddiv(dual(a,da),dual(b,db),deriv);
+    a_eval.addDeriv(da);
+    b_eval.addDeriv(db);
   }
 };
 }
@@ -1093,20 +1129,21 @@ namespace {
 template <typename M>
 struct Evaluator<CofactorMatrixFunc<M>> {
   Evaluator<M> m_eval;
+  FloatMat33 m;
 
   Evaluator(const CofactorMatrixFunc<M> &expr)
-  : m_eval(expr.m)
+  : m_eval(expr.m),
+    m(m_eval.value())
   {
   }
 
   FloatMat33 value() const
   {
-    return cofactorMatrix(m_eval.value());
+    return cofactorMatrix(m);
   }
 
   void addDeriv(const FloatMat33 &dresult)
   {
-    const FloatMat33 &m = m_eval.value();
     FloatMat33 dm = mat33All(0);
 
     dcofactorMatrix(dual(m,dm),dresult);
@@ -1262,23 +1299,30 @@ namespace {
 template <typename M>
 struct Evaluator<Inv<M>> {
   Evaluator<M> m_eval;
+  FloatMat33 m;
+  // Evaluator<decltype(mat33Inv(std::declval<DualMat33>()))
 
   Evaluator(const Inv<M> &expr)
-  : m_eval(expr.m)
+  : m_eval(expr.m),
+    m(m_eval.value())
   {
   }
 
   FloatMat33 value() const
   {
-    return mat33Inv(m_eval.value());
+    return mat33Inv(m);
   }
 
   void addDeriv(const FloatMat33 &dresult)
   {
-    const FloatMat33 &m = m_eval.value();
+#if 1
     FloatMat33 dm = mat33All(0);
     dmat33Inv(dual(m,dm),dresult);
     m_eval.addDeriv(dm);
+#else
+    DerivEvaluator<Inv<M>> deval(*this);
+    deval.addDeriv(dresult);
+#endif
   }
 };
 }
@@ -1444,7 +1488,7 @@ static void testTransposeEvaluator()
 }
 
 
-#if 0
+#if 1
 static void testMat33DivEvaluator()
 {
   RandomEngine random_engine(/*seed*/1);
@@ -1712,7 +1756,7 @@ int main()
   tests::testCofactorMatrixEvaluator();
   tests::testDeterminantEvaluator();
   tests::testTransposeEvaluator();
-  // tests::testMat33DivEvaluator();
+  tests::testMat33DivEvaluator();
   tests::testMat33InvEvaluator();
   tests::testAddOperatorDeriv();
   tests::testMultiplyDeriv();

@@ -15,22 +15,6 @@ using std::max;
 
 
 namespace {
-static float evaluate(float arg)
-{
-  return arg;
-}
-}
-
-
-namespace {
-static void addDeriv(const float &,float)
-{
-  // Nothing to do if we are adding a derivative to a constant.
-}
-}
-
-
-namespace {
 template <typename X,typename Y,typename Z>
 struct Vec3Func {
   X x;
@@ -84,7 +68,7 @@ static float evaluate(const ScalarExpr<Expr> &expr)
 namespace {
 template <typename T>
 struct Mat33 {
-  Mat33(T (&arg)[3][3])
+  Mat33(const T (&arg)[3][3])
   : values{
       {arg[0][0],arg[0][1],arg[0][2]},
       {arg[1][0],arg[1][1],arg[1][2]},
@@ -177,18 +161,13 @@ static Mat33<float> evaluate(const Mat33<T> &m)
 }
 
 
-namespace {
-template <typename Expr>
-static void addDeriv(const ScalarExpr<Expr> &scalar_expr,float deriv)
-{
-  addDeriv(scalar_expr.expr,deriv);
-}
-}
+using FloatMat33 = Mat33<float>;
+using DualMat33 = Mat33<DualFloat>;
 
 
 namespace {
 template <typename T>
-static void addDeriv(const Mat33<T> &m,const Mat33<float> &dm)
+static void addDeriv(const Mat33<T> &m,const FloatMat33 &dm)
 {
   for (int i=0; i!=3; ++i) {
     for (int j=0; j!=3; ++j) {
@@ -217,16 +196,6 @@ static float evaluate(const ScalarAdd<A,B> &expr)
 }
 
 
-namespace {
-template <typename A,typename B>
-static void addDeriv(const ScalarAdd<A,B> &expr,float dresult)
-{
-  addDeriv(expr.a,dresult);
-  addDeriv(expr.b,dresult);
-}
-}
-
-
 template <typename AExpr,typename BExpr>
 static ScalarAdd<AExpr,BExpr> operator+(const AExpr &a,const BExpr &b)
 {
@@ -244,7 +213,7 @@ static ScalarExpr<ScalarAdd<A,B>>
 
 namespace {
 template <typename A,typename B>
-struct Sub {
+struct ScalarSub {
   A a;
   B b;
 };
@@ -253,7 +222,7 @@ struct Sub {
 
 namespace {
 template <typename A,typename B>
-static float evaluate(const Sub<A,B> &expr)
+static float evaluate(const ScalarSub<A,B> &expr)
 {
   return evaluate(expr.a) - evaluate(expr.b);
 }
@@ -262,7 +231,7 @@ static float evaluate(const Sub<A,B> &expr)
 
 namespace {
 template <typename A,typename B>
-static void addDeriv(const Sub<A,B> &expr,float dresult)
+static void addDeriv(const ScalarSub<A,B> &expr,float dresult)
 {
   addDeriv(expr.a, dresult);
   addDeriv(expr.b,-dresult);
@@ -271,14 +240,14 @@ static void addDeriv(const Sub<A,B> &expr,float dresult)
 
 
 template <typename AExpr,typename BExpr>
-static Sub<AExpr,BExpr> operator-(const AExpr &a,const BExpr &b)
+static ScalarSub<AExpr,BExpr> operator-(const AExpr &a,const BExpr &b)
 {
   return {a,b};
 }
 
 
 template <typename A,typename B>
-static ScalarExpr<Sub<A,B>>
+static ScalarExpr<ScalarSub<A,B>>
   operator-(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
 {
   return {{a.expr,b.expr}};
@@ -328,9 +297,6 @@ static ScalarExpr<Mul<A,B>>
 }
 
 
-using FloatMat33 = Mat33<float>;
-
-
 static FloatMat33 mat33All(float arg)
 {
   float values[3][3] = {
@@ -367,9 +333,6 @@ static void ddiv(DualFloat a_arg,DualFloat b_arg,float dresult)
   addDeriv(a_arg,dresult* b/(b*b));
   addDeriv(b_arg,dresult*-a/(b*b));
 }
-
-
-using DualMat33 = Mat33<DualFloat>;
 
 
 static DualFloat dual(float av,float &da)
@@ -696,6 +659,25 @@ template <typename Expr> struct Evaluator;
 
 namespace {
 template <>
+struct Evaluator<float> {
+  float expr;
+
+  Evaluator(float arg)
+  : expr(arg)
+  {
+  }
+
+  float value() const { return expr; }
+
+  void addDeriv(float) const
+  {
+  }
+};
+}
+
+
+namespace {
+template <>
 struct Evaluator<DualFloat> {
   DualFloat expr;
 
@@ -737,45 +719,115 @@ struct Evaluator<DualVec3> {
 
 
 namespace {
-template <>
-struct Evaluator<Mat33<DualFloat>> {
-  Mat33<DualFloat> m_expr;
-  FloatMat33 m_value;
+template <typename T>
+struct Evaluator<Mat33<T>> {
+  Mat33<T> m_expr;
+  Mat33<Evaluator<T>> m_eval;
 
-  Evaluator(const Mat33<DualFloat> &arg)
-  : m_expr(arg), m_value(evaluate(arg))
+  Evaluator(const Mat33<T> &arg)
+  : m_expr(arg),
+    m_eval(
+      {
+        {arg[0][0],arg[0][1],arg[0][2]},
+        {arg[1][0],arg[1][1],arg[1][2]},
+        {arg[2][0],arg[2][1],arg[2][2]}
+      }
+    )
   {
   }
 
-  const FloatMat33& value() const { return m_value; }
-
-  void addDeriv(const FloatMat33 &deriv) const
+  FloatMat33 value() const
   {
-    ::addDeriv(m_expr,deriv);
+    float values[3][3];
+
+    for (int i=0; i!=3; ++i) {
+      for (int j=0; j!=3; ++j) {
+        values[i][j] = m_eval[i][j].value();
+      }
+    }
+
+    return {values};
+  }
+
+  void addDeriv(const FloatMat33 &deriv)
+  {
+    for (int i=0; i!=3; ++i) {
+      for (int j=0; j!=3; ++j) {
+        m_eval[i][j].addDeriv(deriv[i][j]);
+      }
+    }
   }
 };
 }
 
 
+namespace {
+template <typename M>
+struct ScalarExprVar {
+  Evaluator<M> eval;
+  float _value = eval.value();
+  float value() const { return _value; }
+  float deriv = 0;
+  DualFloat dual() { return ::dual(_value,deriv); }
+
+  ScalarExprVar(const M &m)
+  : eval(m)
+  {
+  }
+
+  ~ScalarExprVar()
+  {
+    eval.addDeriv(deriv);
+  }
+};
+}
+
 
 namespace {
 template <typename A,typename B>
 struct Evaluator<ScalarAdd<A,B>> {
-  ScalarAdd<A,B> expr;
+  ScalarExprVar<A> a;
+  ScalarExprVar<B> b;
 
   Evaluator(ScalarAdd<A,B> expr)
-  : expr(expr)
+  : a(expr.a), b(expr.b)
   {
   }
 
   float value() const
   {
-    return evaluate(expr);
+    return a.value() + b.value();
   }
 
-  void addDeriv(float deriv) const
+  void addDeriv(float deriv)
   {
-    return ::addDeriv(expr,deriv);
+    ::addDeriv(a.dual(),deriv);
+    ::addDeriv(b.dual(),deriv);
+  }
+};
+}
+
+
+namespace {
+template <typename A,typename B>
+struct Evaluator<ScalarSub<A,B>> {
+  ScalarExprVar<A> a;
+  ScalarExprVar<B> b;
+
+  Evaluator(ScalarSub<A,B> expr)
+  : a(expr.a), b(expr.b)
+  {
+  }
+
+  float value() const
+  {
+    return a.value() - b.value();
+  }
+
+  void addDeriv(float deriv)
+  {
+    ::addDeriv(a.dual(),deriv);
+    ::addDeriv(b.dual(),-deriv);
   }
 };
 }
@@ -851,7 +903,7 @@ struct Cofactor {
 
 
 template <typename Mat>
-static auto cofactor(const Mat &arg,int i,int j)
+static auto genCofactor(const Mat &arg,int i,int j)
 {
   auto a11 = arg[(i+1)%3][(j+1)%3];
   auto a12 = arg[(i+1)%3][(j+2)%3];
@@ -862,32 +914,11 @@ static auto cofactor(const Mat &arg,int i,int j)
 }
 
 
-static void dcofactor(const DualMat33 &arg,int i,int j,float dresult)
+static float cofactor(const FloatMat33 &arg,int i,int j)
 {
-  addDeriv(cofactor(arg,i,j),dresult);
+  return genCofactor(arg,i,j);
 }
 
-
-namespace {
-template <typename M>
-struct ScalarExprVar {
-  Evaluator<M> eval;
-  float _value = eval.value();
-  float value() const { return _value; }
-  float deriv = 0;
-  DualFloat dual() { return ::dual(_value,deriv); }
-
-  ScalarExprVar(const M &m)
-  : eval(m)
-  {
-  }
-
-  ~ScalarExprVar()
-  {
-    eval.addDeriv(deriv);
-  }
-};
-}
 
 // Specialization when the expression is just a DualFloat.  We don't
 // need to store the value and the dual separately and we don't need
@@ -1012,25 +1043,17 @@ namespace {
 template <typename M>
 struct Evaluator<Cofactor<M>> {
   Mat33ExprVar<M> m;
-  int i;
-  int j;
+  Evaluator<decltype(genCofactor(m.dual(),0,0))> result;
 
   Evaluator(const Cofactor<M> &c)
   : m{c.m},
-    i(c.i),
-    j(c.j)
+    result{genCofactor(m.dual(),c.i,c.j)}
   {
   }
 
-  float value() const
-  {
-    return cofactor(m.value(),i,j);
-  }
+  float value() const { return result.value(); }
 
-  void addDeriv(float dresult)
-  {
-    dcofactor(m.dual(),i,j,dresult);
-  }
+  void addDeriv(float dresult) { result.addDeriv(dresult); }
 };
 }
 
@@ -1091,10 +1114,12 @@ static void dtranspose(const DualMat33 &a,const FloatMat33 &dresult)
 }
 
 
+namespace {
 template <typename M>
 static void addDeriv(Transpose<M> transpose,const FloatMat33 &deriv)
 {
   dtranspose(transpose.m,deriv);
+}
 }
 
 
@@ -1136,17 +1161,30 @@ static ScalarExpr<Cofactor<M>>
 
 
 template <typename Mat>
-static auto cofactorMatrix(const Mat &arg)
+static auto genCofactorMatrix(const Mat &arg)
 {
-  using V = decltype(cofactor(arg,0,0));
+  using V = decltype(genCofactor(arg,0,0));
 
   V values[3][3] = {
-    {cofactor(arg,0,0),cofactor(arg,0,1),cofactor(arg,0,2)},
-    {cofactor(arg,1,0),cofactor(arg,1,1),cofactor(arg,1,2)},
-    {cofactor(arg,2,0),cofactor(arg,2,1),cofactor(arg,2,2)},
+    {genCofactor(arg,0,0),genCofactor(arg,0,1),genCofactor(arg,0,2)},
+    {genCofactor(arg,1,0),genCofactor(arg,1,1),genCofactor(arg,1,2)},
+    {genCofactor(arg,2,0),genCofactor(arg,2,1),genCofactor(arg,2,2)},
   };
 
   return Mat33<V>(values);
+}
+
+
+static auto cofactorMatrix(const FloatMat33 &arg)
+{
+  return genCofactorMatrix(arg);
+}
+
+
+template <typename T>
+static Mat33Expr<Mat33<T>> expr(const Mat33<T> &expr)
+{
+  return {expr};
 }
 
 
@@ -1165,20 +1203,12 @@ static Mat33Expr<CofactorMatrixFunc<M>> cofactorMatrix(const Mat33Expr<M> &m)
 }
 
 
-static void dcofactorMatrix(const DualMat33 &arg,const FloatMat33 &dresult)
-{
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      dcofactor(arg,i,j,dresult[i][j]);
-    }
-  }
-}
-
-
 namespace {
 template <typename M>
 struct Evaluator<CofactorMatrixFunc<M>> {
   Mat33ExprVar<M> m;
+  Evaluator<decltype(genCofactorMatrix(m.dual()))> result_eval =
+    genCofactorMatrix(m.dual());
 
   Evaluator(const CofactorMatrixFunc<M> &expr)
   : m(expr.m)
@@ -1187,12 +1217,12 @@ struct Evaluator<CofactorMatrixFunc<M>> {
 
   FloatMat33 value() const
   {
-    return cofactorMatrix(m.value());
+    return result_eval.value();
   }
 
   void addDeriv(const FloatMat33 &dresult)
   {
-    dcofactorMatrix(m.dual(),dresult);
+    result_eval.addDeriv(dresult);
   }
 };
 }
@@ -1202,9 +1232,9 @@ template <typename Mat>
 static auto genDeterminant(const Mat &a)
 {
   return
-    a[0][0] * cofactor(a,0,0) +
-    a[0][1] * cofactor(a,0,1) +
-    a[0][2] * cofactor(a,0,2);
+    a[0][0] * genCofactor(a,0,0) +
+    a[0][1] * genCofactor(a,0,1) +
+    a[0][2] * genCofactor(a,0,2);
 }
 
 
@@ -1214,13 +1244,6 @@ static auto determinant(const FloatMat33 &a)
 }
 
 
-static auto determinant(const DualMat33 &a)
-{
-  return genDeterminant(a);
-}
-
-
-// We need a determinant function that works on a Mat33Expr
 
 namespace {
 template <typename M>
@@ -1238,22 +1261,12 @@ static ScalarExpr<Determinant<M>> determinant(const Mat33Expr<M> &m)
 }
 
 
-static void ddeterminant(const DualMat33 &a,float dresult)
-{
-  addDeriv(determinant(a),dresult);
-}
-
-
-static Mat33Expr<DualMat33> expr(const DualMat33 &expr)
-{
-  return {expr};
-}
-
-
 namespace {
 template <typename M>
 struct Evaluator<Determinant<M>> {
   Mat33ExprVar<M> m;
+  Evaluator<decltype(genDeterminant(m.dual()))>
+    result{genDeterminant(m.dual())};
 
   Evaluator(const Determinant<M> &expr)
   : m(expr.m)
@@ -1262,21 +1275,14 @@ struct Evaluator<Determinant<M>> {
 
   float value() const
   {
-    return determinant(m.value());
+    return result.value();
   }
 
   void addDeriv(float dresult)
   {
-    ddeterminant(m.dual(),dresult);
+    result.addDeriv(dresult);
   }
 };
-}
-
-
-template <typename M>
-static void addDeriv(Determinant<M> expr,float deriv)
-{
-  ddeterminant(expr.m,deriv);
 }
 
 
@@ -1403,6 +1409,33 @@ static Vec3Expr<Vec3Func<A,B,C>>
 }
 
 namespace tests {
+
+static void testMat33Inv()
+{
+  {
+    FloatMat33 a = mat33Identity();
+    FloatMat33 a_inv = mat33Inv(a);
+    FloatMat33 a_times_a_inv = a*a_inv;
+    assertNear(a_times_a_inv,mat33Identity(),1e-4);
+  }
+  {
+    RandomEngine random_engine(/*seed*/1);
+    FloatMat33 a = randomMat33(random_engine);
+    FloatMat33 a_inv = mat33Inv(a);
+    FloatMat33 a_times_a_inv = a*a_inv;
+    assertNear(a_times_a_inv,mat33Identity(),1e-4);
+  }
+}
+
+
+static void testScalarConstantEvaluator()
+{
+  float dresult = 1;
+  float result = evalAndAddDeriv(expr(5),dresult);
+  assert(result==5);
+}
+
+
 static void testScalarAddEvaluator()
 {
   {
@@ -1426,6 +1459,21 @@ static void testScalarAddEvaluator()
     assert(da==1);
     assert(result==3);
   }
+}
+
+
+static void testScalarSubEvaluator()
+{
+  float a = 1;
+  float da = 0;
+  float b = 2;
+  float db = 0;
+  float dresult = 1;
+  float result = evalAndAddDeriv(expr(dual(a,da)) - expr(dual(b,db)),dresult);
+
+  assert(da== 1);
+  assert(db==-1);
+  assert(result==-1);
 }
 
 
@@ -1488,6 +1536,34 @@ static void testCofactorEvaluator()
       assertNear(dmat,finiteDeriv(f,mat),1e-4);
     }
   }
+}
+
+
+static void testMat33Evaluator()
+{
+  RandomEngine random_engine(/*seed*/1);
+  FloatMat33 mat = randomMat33(random_engine);
+  FloatMat33 dmat = mat33All(0);
+  DualMat33 m = dual(mat,dmat);
+  using Element = ScalarAdd<DualFloat,float>;
+  Element values[3][3] = {
+    {(expr(m[0][0]) + expr(1)).expr,
+     (expr(m[0][1]) + expr(1)).expr,
+     (expr(m[0][2]) + expr(1)).expr},
+    {(expr(m[1][0]) + expr(1)).expr,
+     (expr(m[1][1]) + expr(1)).expr,
+     (expr(m[1][2]) + expr(1)).expr},
+    {(expr(m[2][0]) + expr(1)).expr,
+     (expr(m[2][1]) + expr(1)).expr,
+     (expr(m[2][2]) + expr(1)).expr},
+  };
+
+  auto e = expr(Mat33<Element>(values));
+  FloatMat33 dresult = randomMat33(random_engine);
+
+  evalAndAddDeriv(e,dresult);
+
+  assertNear(dmat,dresult,0);
 }
 
 
@@ -1601,52 +1677,6 @@ static void testDotEvaluator()
 }
 
 
-static void testAddOperatorDeriv()
-{
-  float av = 5;
-  float bv = 6;
-  float da = 0;
-  float db = 0;
-  auto a = dual(av,da);
-  auto b = dual(bv,db);
-  addDeriv(a+b,1);
-  assertNear(da,1.0f,0);
-  assertNear(db,1.0f,0);
-}
-
-
-static void testMultiplyDeriv()
-{
-  float a = 5;
-  float b = 6;
-  float da = 0;
-  float db = 0;
-  addDeriv(expr(dual(a,da))*expr(dual(b,db)),/*dresult*/1);
-  auto f = [&](){ return a*b; };
-  float fda = finiteDeriv(f,a);
-  float fdb = finiteDeriv(f,b);
-  assertNear(da,fda,1e-3);
-  assertNear(db,fdb,1e-3);
-}
-
-
-static void testDotDeriv()
-{
-  RandomEngine random_engine{/*seed*/1};
-  FloatVec3 v1 = randomVec3(random_engine);
-  FloatVec3 v2 = randomVec3(random_engine);
-  FloatVec3 dv1{0,0,0};
-  FloatVec3 dv2{0,0,0};
-  float dresult = 1;
-  evalAndAddDeriv(genDot(expr(dual(v1,dv1)),expr(dual(v2,dv2))),dresult);
-  auto f = [&](){ return dot(v1,v2); };
-  FloatVec3 fdv1 = finiteDeriv(f,v1);
-  FloatVec3 fdv2 = finiteDeriv(f,v2);
-  assertNear(dv1,fdv1,1e-4);
-  assertNear(dv2,fdv2,1e-4);
-}
-
-
 #if 0
 static void testDot2()
 {
@@ -1681,109 +1711,26 @@ static void testAddingVectors()
 #endif
 
 
-static void testMat33Inv()
-{
-  {
-    FloatMat33 a = mat33Identity();
-    FloatMat33 a_inv = mat33Inv(a);
-    FloatMat33 a_times_a_inv = a*a_inv;
-    assertNear(a_times_a_inv,mat33Identity(),1e-4);
-  }
-  {
-    RandomEngine random_engine(/*seed*/1);
-    FloatMat33 a = randomMat33(random_engine);
-    FloatMat33 a_inv = mat33Inv(a);
-    FloatMat33 a_times_a_inv = a*a_inv;
-    assertNear(a_times_a_inv,mat33Identity(),1e-4);
-  }
-}
-
-
-static void testCofactorDeriv()
-{
-  RandomEngine random_engine(/*seed*/1);
-  FloatMat33 a = randomMat33(random_engine);
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      float dresult = 1;
-      FloatMat33 da = mat33All(0);
-      dcofactor(dual(a,da),i,j,dresult);
-      auto f = [&](){ return cofactor(a,i,j); };
-      FloatMat33 fda = finiteDeriv(f,a);
-      assertNear(da,fda,1e-4);
-    }
-  }
-}
-
-
-static void testMat33CofactorMatrixDeriv()
-{
-  RandomEngine random_engine(/*seed*/1);
-  FloatMat33 a = randomMat33(random_engine);
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      FloatMat33 dresult = mat33All(0);
-      dresult[i][j] = 1;
-      FloatMat33 da = mat33All(0);
-      dcofactorMatrix(dual(a,da),dresult);
-      auto f = [&](){ return cofactorMatrix(a)[i][j]; };
-      float fdaij = finiteDeriv(f,a[i][j]);
-      assertNear(da[i][j],fdaij,1e-4);
-    }
-  }
-}
-
-
-static void testDDeterminant()
-{
-  RandomEngine random_engine(/*seed*/1);
-  FloatMat33 a = randomMat33(random_engine);
-  FloatMat33 da = mat33All(0);
-
-  ddeterminant(dual(a,da),/*dresult*/1);
-  auto f = [&](){ return determinant(a); };
-  FloatMat33 fda = finiteDeriv(f,a);
-  assertNear(da,fda,1e-4);
-}
-
-
-static void testDeterminantDeriv()
-{
-  RandomEngine random_engine(/*seed*/1);
-  FloatMat33 a = randomMat33(random_engine);
-  FloatMat33 da = mat33All(0);
-
-  addDeriv(determinant(expr(dual(a,da))).expr,/*dresult*/1);
-  auto f = [&](){ return determinant(a); };
-  FloatMat33 fda = finiteDeriv(f,a);
-  assertNear(da,fda,1e-4);
-}
 }
 
 
 int main()
 {
+  tests::testMat33Inv();
+  tests::testScalarConstantEvaluator();
   tests::testScalarAddEvaluator();
+  tests::testScalarSubEvaluator();
   tests::testScalarMulEvaluator();
   tests::testScalarDivEvaluator();
   tests::testDualVec3Evaluator();
   tests::testCofactorEvaluator();
+  tests::testMat33Evaluator();
   tests::testCofactorMatrixEvaluator();
   tests::testDeterminantEvaluator();
   tests::testTransposeEvaluator();
   tests::testMat33DivEvaluator();
   tests::testMat33InvEvaluator();
   tests::testDotEvaluator();
-  tests::testAddOperatorDeriv();
-  tests::testMultiplyDeriv();
-  tests::testDotDeriv();
   //tests::testDot2();
   // tests::testAddingVectors();
-  tests::testMat33Inv();
-  tests::testCofactorDeriv();
-  tests::testMat33CofactorMatrixDeriv();
-  tests::testDDeterminant();
-  tests::testDeterminantDeriv();
 }

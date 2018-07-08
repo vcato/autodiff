@@ -36,7 +36,7 @@ static void addDeriv(const float &,float)
 
 namespace {
 template <typename X,typename Y,typename Z>
-struct VectorFunc {
+struct Vec3Func {
   X x;
   Y y;
   Z z;
@@ -384,10 +384,10 @@ static DualFloat dual(float av,float &da)
 
 namespace {
 template <typename T>
-struct Vector {
+struct Vec3 {
   T x, y, z;
 
-  friend ostream& operator<<(ostream &stream,const Vector &self)
+  friend ostream& operator<<(ostream &stream,const Vec3 &self)
   {
     stream << "[" << self.x << "," << self.y << "," << self.z << "]";
     return stream;
@@ -396,14 +396,13 @@ struct Vector {
 }
 
 
-using DualVector = Vector<DualFloat>;
-
-using FloatVector = Vector<float>;
+using DualVec3 = Vec3<DualFloat>;
+using FloatVec3 = Vec3<float>;
 
 
 namespace {
 template <typename X,typename Y,typename Z>
-static void addDeriv(VectorFunc<X,Y,Z> f,const FloatVector &deriv)
+static void addDeriv(Vec3Func<X,Y,Z> f,const FloatVec3 &deriv)
 {
   addDeriv(f.x,deriv.x);
   addDeriv(f.y,deriv.y);
@@ -414,7 +413,7 @@ static void addDeriv(VectorFunc<X,Y,Z> f,const FloatVector &deriv)
 
 namespace {
 template <typename X,typename Y,typename Z>
-static FloatVector evaluate(VectorFunc<X,Y,Z> f)
+static FloatVec3 evaluate(Vec3Func<X,Y,Z> f)
 {
   float x = evaluate(f.x);
   float y = evaluate(f.y);
@@ -424,7 +423,7 @@ static FloatVector evaluate(VectorFunc<X,Y,Z> f)
 }
 
 
-static DualVector dual(FloatVector v,FloatVector &dv)
+static DualVec3 dual(FloatVec3 v,FloatVec3 &dv)
 {
   return {{v.x,dv.x},{v.y,dv.y},{v.z,dv.z}};
 }
@@ -542,7 +541,7 @@ static float max(float a,float b,float c)
 }
 
 
-static float differenceBetween(const FloatVector &a,const FloatVector &b)
+static float differenceBetween(const FloatVec3 &a,const FloatVec3 &b)
 {
   float dx = differenceBetween(a.x, b.x);
   float dy = differenceBetween(a.y, b.y);
@@ -553,12 +552,12 @@ static float differenceBetween(const FloatVector &a,const FloatVector &b)
 
 
 template <typename Function>
-static FloatVector finiteDeriv(Function f,FloatVector &v)
+static FloatVec3 finiteDeriv(Function f,FloatVec3 &v)
 {
   float dx = finiteDeriv(f,v.x);
   float dy = finiteDeriv(f,v.y);
   float dz = finiteDeriv(f,v.z);
-  return FloatVector{dx,dy,dz};
+  return FloatVec3{dx,dy,dz};
 }
 
 
@@ -588,21 +587,21 @@ static void
 }
 
 
-static FloatVector randomVector(RandomEngine &random_engine)
+static FloatVec3 randomVec3(RandomEngine &random_engine)
 {
   float x = randomFloat(-1,1,random_engine);
   float y = randomFloat(-1,1,random_engine);
   float z = randomFloat(-1,1,random_engine);
 
-  return FloatVector{x,y,z};
+  return FloatVec3{x,y,z};
 }
 
 
 static FloatMat33 randomMat33(RandomEngine &random_engine)
 {
-  FloatVector x = randomVector(random_engine);
-  FloatVector y = randomVector(random_engine);
-  FloatVector z = randomVector(random_engine);
+  FloatVec3 x = randomVec3(random_engine);
+  FloatVec3 y = randomVec3(random_engine);
+  FloatVec3 z = randomVec3(random_engine);
 
   float values[3][3] = {
     {x.x, x.y, x.z},
@@ -616,7 +615,7 @@ static FloatMat33 randomMat33(RandomEngine &random_engine)
 
 namespace {
 template <typename Expr>
-struct VectorExpr {
+struct Vec3Expr {
   Expr expr;
 };
 }
@@ -639,12 +638,12 @@ struct Dot {
 
 
 template <typename A,typename B>
-static ScalarExpr<Dot<A,B>> dot(VectorExpr<A> a,VectorExpr<B> b)
+static ScalarExpr<Dot<A,B>> dot(Vec3Expr<A> a,Vec3Expr<B> b)
 {
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
-static float dot(const FloatVector &a,const FloatVector &b)
+static float dot(const FloatVec3 &a,const FloatVec3 &b)
 {
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
@@ -958,22 +957,22 @@ struct Evaluator<Mat33Div<A,B>> {
 
 namespace {
 template <typename Expr>
-struct VectorExprVar {
+struct Vec3ExprVar {
   Expr expr;
 
-  FloatVector value = evaluate(expr);
-  FloatVector dvalue{0,0,0};
+  FloatVec3 value = evaluate(expr);
+  FloatVec3 dvalue{0,0,0};
 
   DualFloat x{value.x,dvalue.x};
   DualFloat y{value.y,dvalue.y};
   DualFloat z{value.z,dvalue.z};
 
-  VectorExprVar(Expr expr)
+  Vec3ExprVar(Expr expr)
   : expr(expr)
   {
   }
 
-  ~VectorExprVar()
+  ~Vec3ExprVar()
   {
     addDeriv(expr,dvalue);
   }
@@ -1005,7 +1004,7 @@ static void addDeriv(const ScalarExprVar<Expr> &e,float deriv)
 
 #if 0
 template <typename Expr>
-static VectorExprVar<Expr> var(const VectorExpr<Expr> &expr)
+static Vec3ExprVar<Expr> var(const Vec3Expr<Expr> &expr)
 {
   return {expr.expr};
 }
@@ -1023,19 +1022,19 @@ static ScalarExprVar<Expr> var(const Expr &expr)
 
 namespace {
 template <>
-struct VectorExpr<DualVector> {
+struct Vec3Expr<DualVec3> {
   ScalarExpr<DualFloat> x, y, z;
 };
 }
 
 
-static VectorExpr<DualVector> expr(const DualVector &expr)
+static Vec3Expr<DualVec3> expr(const DualVec3 &expr)
 {
   return {{expr.x},{expr.y},{expr.z}};
 }
 
 
-static void ddot(DualVector a,DualVector b,float dresult)
+static void ddot(DualVec3 a,DualVec3 b,float dresult)
 {
   addDeriv(dot(expr(a),expr(b)),dresult);
 }
@@ -1361,24 +1360,22 @@ static FloatMat33 mat33Identity()
 }
 
 
-#if 1
 static ScalarExpr<float> expr(float x)
 {
   return {x};
 }
-#endif
 
 
 template <typename A,typename B,typename C>
-static VectorExpr<VectorFunc<A,B,C>>
-  vector(
+static Vec3Expr<Vec3Func<A,B,C>>
+  vec3(
     ScalarExpr<A> a,
     ScalarExpr<B> b,
     ScalarExpr<C> c
   )
 {
-  auto f = VectorFunc<A,B,C>{a.expr,b.expr,c.expr};
-  return VectorExpr<VectorFunc<A,B,C>>{f};
+  auto f = Vec3Func<A,B,C>{a.expr,b.expr,c.expr};
+  return Vec3Expr<Vec3Func<A,B,C>>{f};
 }
 
 
@@ -1538,7 +1535,6 @@ static void testTransposeEvaluator()
 }
 
 
-#if 1
 static void testMat33DivEvaluator()
 {
   RandomEngine random_engine(/*seed*/1);
@@ -1555,7 +1551,6 @@ static void testMat33DivEvaluator()
   assert(result[0][0]==f());
   assertNear(dmat,finiteDeriv(f,mat),1e-4);
 }
-#endif
 
 
 static void testMat33InvEvaluator()
@@ -1610,14 +1605,14 @@ static void testMultiplyDeriv()
 static void testDot()
 {
   RandomEngine random_engine{/*seed*/1};
-  FloatVector v1 = randomVector(random_engine);
-  FloatVector v2 = randomVector(random_engine);
-  FloatVector dv1{0,0,0};
-  FloatVector dv2{0,0,0};
+  FloatVec3 v1 = randomVec3(random_engine);
+  FloatVec3 v2 = randomVec3(random_engine);
+  FloatVec3 dv1{0,0,0};
+  FloatVec3 dv2{0,0,0};
   ddot(dual(v1,dv1),dual(v2,dv2),1);
   auto f = [&](){ return dot(v1,v2); };
-  FloatVector fdv1 = finiteDeriv(f,v1);
-  FloatVector fdv2 = finiteDeriv(f,v2);
+  FloatVec3 fdv1 = finiteDeriv(f,v1);
+  FloatVec3 fdv2 = finiteDeriv(f,v2);
   assertNear(dv1,fdv1,1e-4);
   assertNear(dv2,fdv2,1e-4);
 }
@@ -1629,8 +1624,8 @@ static void testDot2()
   float dv = 0;
   {
     DualFloat v{3,dv};
-    auto a = var(vector(expr(2),expr(v),expr(4)));
-    auto b = var(vector(expr(5),expr(6),expr(7)));
+    auto a = var(vec3(expr(2),expr(v),expr(4)));
+    auto b = var(vec3(expr(5),expr(6),expr(7)));
     auto e = var(dot(a,b));
     addDeriv(e,1);
   }
@@ -1646,8 +1641,8 @@ static void testAddingVectors()
 
   {
     DualFloat v{3,dv};
-    auto a = vector(1,2,v);
-    auto b = vector(4,5,6);
+    auto a = vec3(1,2,v);
+    auto b = vec3(4,5,6);
     auto e = var(a+b);
     addDeriv(e,1);
   }

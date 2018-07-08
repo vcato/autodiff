@@ -438,9 +438,6 @@ static DualMat33 dual(Mat33<float> v,Mat33<float> &dv)
 }
 
 
-static void ddiv(DualMat33 a,DualFloat b,const FloatMat33 &dresult);
-
-
 namespace {
 template <typename Expr>
 struct Mat33Expr {
@@ -504,21 +501,6 @@ static ScalarExpr<ScalarDiv<A,B>> operator/(ScalarExpr<A> a,ScalarExpr<B> b)
 static ScalarExpr<DualFloat> expr(const DualFloat &expr)
 {
   return {{expr}};
-}
-
-
-static void
-  ddiv(
-    DualMat33 a,
-    DualFloat b,
-    const FloatMat33 &dresult
-  )
-{
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      addDeriv(expr(a[i][j])/expr(b),dresult[i][j]);
-    }
-  }
 }
 
 
@@ -864,11 +846,17 @@ struct Evaluator<Mat33Div<A,B>> {
 
   void addDeriv(const FloatMat33 &deriv)
   {
-    FloatMat33 a = a_eval.value();
     FloatMat33 da = mat33All(0);
-    float b = b_eval.value();
+    DualMat33 a = dual(a_eval.value(),da);
     float db = 0;
-    ddiv(dual(a,da),dual(b,db),deriv);
+    DualFloat b = dual(b_eval.value(),db);
+
+    for (int i=0; i!=3; ++i) {
+      for (int j=0; j!=3; ++j) {
+        ::addDeriv(expr(a[i][j])/expr(b),deriv[i][j]);
+      }
+    }
+
     a_eval.addDeriv(da);
     b_eval.addDeriv(db);
   }

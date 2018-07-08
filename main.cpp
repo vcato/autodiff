@@ -822,9 +822,10 @@ namespace {
 template <typename M>
 struct ScalarExprVar {
   Evaluator<M> eval;
-  float value = eval.value();
+  float _value = eval.value();
+  float value() const { return _value; }
   float deriv = 0;
-  DualFloat dual() { return ::dual(value,deriv); }
+  DualFloat dual() { return ::dual(_value,deriv); }
 
   ScalarExprVar(const M &m)
   : eval(m)
@@ -838,15 +839,34 @@ struct ScalarExprVar {
 };
 }
 
+// Specialization when the expression is just a DualFloat.  We don't
+// need to store the value and the dual separately and we don't need
+// to add the derivative in the destructor.
+namespace {
+template <>
+struct ScalarExprVar<DualFloat> {
+  DualFloat expr;
+
+  ScalarExprVar(const DualFloat &m)
+  : expr(m)
+  {
+  }
+
+  float value() const { return evaluate(expr); }
+
+  DualFloat dual() { return expr; }
+};
+}
 
 
 namespace {
 template <typename M>
 struct Mat33ExprVar {
   Evaluator<M> eval;
-  FloatMat33 value = eval.value();
+  FloatMat33 _value = eval.value();
+  FloatMat33 value() const { return _value; }
   FloatMat33 deriv = mat33All(0);
-  DualMat33 dual() { return ::dual(value,deriv); }
+  DualMat33 dual() { return ::dual(_value,deriv); }
 
   Mat33ExprVar(const M &m)
   : eval(m)
@@ -857,6 +877,26 @@ struct Mat33ExprVar {
   {
     eval.addDeriv(deriv);
   }
+};
+}
+
+
+// Specialization in the case of a DualMat33 expression, where we don't
+// need to keep the value separately, and we don't need to add the
+// derivative in the destructor.
+namespace {
+template <>
+struct Mat33ExprVar<DualMat33> {
+  DualMat33 expr;
+
+  Mat33ExprVar(const DualMat33 &e)
+  : expr(e)
+  {
+  }
+
+  FloatMat33 value() const { return evaluate(expr); }
+
+  DualMat33 dual() { return expr; }
 };
 }
 
@@ -877,7 +917,7 @@ struct Evaluator<Cofactor<M>> {
 
   float value() const
   {
-    return cofactor(m.value,i,j);
+    return cofactor(m.value(),i,j);
   }
 
   void addDeriv(float dresult)
@@ -902,7 +942,7 @@ struct Evaluator<Mat33Div<A,B>> {
 
   FloatMat33 value() const
   {
-    return a.value / b.value;
+    return a.value() / b.value();
   }
 
   void addDeriv(const FloatMat33 &deriv)
@@ -1053,7 +1093,7 @@ struct Evaluator<Transpose<M>> {
 
   FloatMat33 value() const
   {
-    return transpose(m.value);
+    return transpose(m.value());
   }
 
   void addDeriv(const FloatMat33 &dresult)
@@ -1124,7 +1164,7 @@ struct Evaluator<CofactorMatrixFunc<M>> {
 
   FloatMat33 value() const
   {
-    return cofactorMatrix(m.value);
+    return cofactorMatrix(m.value());
   }
 
   void addDeriv(const FloatMat33 &dresult)
@@ -1199,7 +1239,7 @@ struct Evaluator<Determinant<M>> {
 
   float value() const
   {
-    return determinant(m.value);
+    return determinant(m.value());
   }
 
   void addDeriv(float dresult)

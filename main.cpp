@@ -754,6 +754,37 @@ struct Evaluator<Mul<A,B>> {
 
 
 namespace {
+template <typename A,typename B>
+struct Evaluator<ScalarDiv<A,B>> {
+  Evaluator<A> a_eval;
+  Evaluator<B> b_eval;
+  float a = a_eval.value();
+  float b = b_eval.value();
+
+  Evaluator(ScalarDiv<A,B> expr)
+  : a_eval(expr.a),
+    b_eval(expr.b)
+  {
+  }
+
+  float value() const
+  {
+    return a/b;
+  }
+
+  void addDeriv(float deriv)
+  {
+    float da = 0;
+    float db = 0;
+    ddiv(dual(a,da),dual(b,db),deriv);
+    a_eval.addDeriv(da);
+    b_eval.addDeriv(db);
+  }
+};
+}
+
+
+namespace {
 template <typename M>
 struct Cofactor {
   M m;
@@ -1334,6 +1365,22 @@ static void testScalarMulEvaluator()
 }
 
 
+static void testScalarDivEvaluator()
+{
+  float a = 1;
+  float da = 0;
+  float b = 2;
+  float db = 0;
+  float dresult = 1;
+  float result = evalAndAddDeriv(expr(dual(a,da)) / expr(dual(b,db)),dresult);
+  auto f = [&]{ return a/b; };
+
+  assertNear(da,finiteDeriv(f,a),1e-4);
+  assertNear(db,finiteDeriv(f,b),1e-4);
+  assert(result==a/b);
+}
+
+
 static void testCofactorEvaluator()
 {
   RandomEngine random_engine(/*seed*/1);
@@ -1630,6 +1677,7 @@ int main()
 {
   tests::testScalarAddEvaluator();
   tests::testScalarMulEvaluator();
+  tests::testScalarDivEvaluator();
   tests::testCofactorEvaluator();
   tests::testCofactorMatrixEvaluator();
   tests::testDeterminantEvaluator();

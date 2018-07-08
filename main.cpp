@@ -66,6 +66,28 @@ static float evaluate(const ScalarExpr<Expr> &expr)
 
 
 namespace {
+template <typename Self>
+struct RowRef {
+  Self &self;
+  int i;
+
+  decltype(auto) operator[](int j)
+  {
+    return self.element(self,i,j);
+  }
+};
+}
+
+
+namespace {
+template <typename Self>
+static auto row(Self &arg,int i)
+{
+  return RowRef<Self>{arg,i};
+}
+}
+
+namespace {
 template <typename T>
 struct Mat33 {
   Mat33(const T (&arg)[3][3])
@@ -104,23 +126,6 @@ struct Mat33 {
   }
 
   template <typename Self>
-  struct RowRef {
-    Self &self;
-    int i;
-
-    auto &operator[](int j)
-    {
-      return self(i,j);
-    }
-  };
-
-  template <typename Self>
-  static auto row(Self &arg,int i)
-  {
-    return RowRef<Self>{arg,i};
-  }
-
-  template <typename Self>
   static decltype(auto) element(Self &arg,int i,int j)
   {
     assert(i>=0);
@@ -132,8 +137,6 @@ struct Mat33 {
 
   auto operator[](int i)             { return row(*this,i); }
   auto operator[](int i) const       { return row(*this,i); }
-  decltype(auto) operator()(int i,int j)       { return element(*this,i,j); }
-  decltype(auto) operator()(int i,int j) const { return element(*this,i,j); }
 
   T values[3][3];
 };
@@ -196,13 +199,6 @@ static float evaluate(const ScalarAdd<A,B> &expr)
 }
 
 
-template <typename AExpr,typename BExpr>
-static ScalarAdd<AExpr,BExpr> operator+(const AExpr &a,const BExpr &b)
-{
-  return {a,b};
-}
-
-
 template <typename A,typename B>
 static ScalarExpr<ScalarAdd<A,B>>
   operator+(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
@@ -229,23 +225,6 @@ static float evaluate(const ScalarSub<A,B> &expr)
 }
 
 
-namespace {
-template <typename A,typename B>
-static void addDeriv(const ScalarSub<A,B> &expr,float dresult)
-{
-  addDeriv(expr.a, dresult);
-  addDeriv(expr.b,-dresult);
-}
-}
-
-
-template <typename AExpr,typename BExpr>
-static ScalarSub<AExpr,BExpr> operator-(const AExpr &a,const BExpr &b)
-{
-  return {a,b};
-}
-
-
 template <typename A,typename B>
 static ScalarExpr<ScalarSub<A,B>>
   operator-(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
@@ -256,7 +235,7 @@ static ScalarExpr<ScalarSub<A,B>>
 
 namespace {
 template <typename A,typename B>
-struct Mul {
+struct ScalarMul {
   A a;
   B b;
 };
@@ -265,7 +244,7 @@ struct Mul {
 
 namespace {
 template <typename A,typename B>
-static float evaluate(const Mul<A,B> &expr)
+static float evaluate(const ScalarMul<A,B> &expr)
 {
   return evaluate(expr.a)*evaluate(expr.b);
 }
@@ -274,7 +253,7 @@ static float evaluate(const Mul<A,B> &expr)
 
 namespace {
 template <typename A,typename B>
-static void addDeriv(const Mul<A,B> &expr,float dresult)
+static void addDeriv(const ScalarMul<A,B> &expr,float dresult)
 {
   addDeriv(expr.a, dresult*evaluate(expr.b));
   addDeriv(expr.b, dresult*evaluate(expr.a));
@@ -282,15 +261,8 @@ static void addDeriv(const Mul<A,B> &expr,float dresult)
 }
 
 
-template <typename AExpr,typename BExpr>
-static Mul<AExpr,BExpr> operator*(const AExpr &a,const BExpr &b)
-{
-  return {a,b};
-}
-
-
 template <typename A,typename B>
-static ScalarExpr<Mul<A,B>>
+static ScalarExpr<ScalarMul<A,B>>
   operator*(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
 {
   return {{a.expr,b.expr}};
@@ -423,6 +395,27 @@ namespace {
 template <typename Expr>
 struct Mat33Expr {
   Expr expr;
+};
+}
+
+
+namespace {
+template <>
+struct Mat33Expr<DualMat33> {
+  DualMat33 expr;
+
+  template <typename Self>
+  static auto element(Self &arg,int i,int j)
+  {
+    assert(i>=0);
+    assert(i<3);
+    assert(j>=0);
+    assert(j<3);
+    return ScalarExpr<DualFloat>{arg.expr[i][j]};
+  }
+
+  auto operator[](int i)             { return row(*this,i); }
+  auto operator[](int i) const       { return row(*this,i); }
 };
 }
 
@@ -595,12 +588,6 @@ namespace {
 template <typename Expr>
 struct Vec3Expr {
   Expr expr;
-
-#if 0
-  ScalarExpr<XMember<EXpr>> x() const { return {{expr}}; }
-  ScalarExpr<YMember<EXpr>> y() const { return {{expr}}; }
-  ScalarExpr<ZMember<EXpr>> z() const { return {{expr}}; }
-#endif
 };
 }
 
@@ -835,27 +822,25 @@ struct Evaluator<ScalarSub<A,B>> {
 
 namespace {
 template <typename A,typename B>
-struct Evaluator<Mul<A,B>> {
-  Mul<A,B> expr;
-  float a;
-  float b;
+struct Evaluator<ScalarMul<A,B>> {
+  ScalarExprVar<A> a;
+  ScalarExprVar<B> b;
 
-  Evaluator(Mul<A,B> expr)
-  : expr(expr),
-    a(evaluate(expr.a)),
-    b(evaluate(expr.b))
+  Evaluator(ScalarMul<A,B> expr)
+  : a(expr.a),
+    b(expr.b)
   {
   }
 
   float value() const
   {
-    return a*b;
+    return a.value() * b.value();
   }
 
   void addDeriv(float deriv)
   {
-    ::addDeriv(expr.b,deriv*a);
-    ::addDeriv(expr.a,deriv*b);
+    ::addDeriv(a.dual(),deriv*b.value());
+    ::addDeriv(b.dual(),deriv*a.value());
   }
 };
 }
@@ -1039,15 +1024,22 @@ struct Mat33ExprVar<DualMat33> {
 }
 
 
+template <typename T>
+static Mat33Expr<Mat33<T>> expr(const Mat33<T> &expr)
+{
+  return {expr};
+}
+
+
 namespace {
 template <typename M>
 struct Evaluator<Cofactor<M>> {
   Mat33ExprVar<M> m;
-  Evaluator<decltype(genCofactor(m.dual(),0,0))> result;
+  Evaluator<decltype(genCofactor(expr(m.dual()),0,0).expr)> result;
 
   Evaluator(const Cofactor<M> &c)
   : m{c.m},
-    result{genCofactor(m.dual(),c.i,c.j)}
+    result{genCofactor(expr(m.dual()),c.i,c.j).expr}
   {
   }
 
@@ -1160,6 +1152,26 @@ static ScalarExpr<Cofactor<M>>
 }
 
 
+template <typename T>
+static Mat33<T> mat33(const T (&values)[3][3])
+{
+  return Mat33<T>(values);
+}
+
+
+template <typename T>
+static Mat33Expr<Mat33<T>> mat33(const ScalarExpr<T> (&arg)[3][3])
+{
+  T values[3][3] = {
+    {arg[0][0].expr,arg[0][1].expr,arg[0][2].expr},
+    {arg[1][0].expr,arg[1][1].expr,arg[1][2].expr},
+    {arg[2][0].expr,arg[2][1].expr,arg[2][2].expr},
+  };
+
+  return {{values}};
+}
+
+
 template <typename Mat>
 static auto genCofactorMatrix(const Mat &arg)
 {
@@ -1171,20 +1183,13 @@ static auto genCofactorMatrix(const Mat &arg)
     {genCofactor(arg,2,0),genCofactor(arg,2,1),genCofactor(arg,2,2)},
   };
 
-  return Mat33<V>(values);
+  return mat33(values);
 }
 
 
 static auto cofactorMatrix(const FloatMat33 &arg)
 {
   return genCofactorMatrix(arg);
-}
-
-
-template <typename T>
-static Mat33Expr<Mat33<T>> expr(const Mat33<T> &expr)
-{
-  return {expr};
 }
 
 
@@ -1207,8 +1212,8 @@ namespace {
 template <typename M>
 struct Evaluator<CofactorMatrixFunc<M>> {
   Mat33ExprVar<M> m;
-  Evaluator<decltype(genCofactorMatrix(m.dual()))> result_eval =
-    genCofactorMatrix(m.dual());
+  Evaluator<decltype(genCofactorMatrix(expr(m.dual())).expr)> result_eval =
+    genCofactorMatrix(expr(m.dual())).expr;
 
   Evaluator(const CofactorMatrixFunc<M> &expr)
   : m(expr.m)
@@ -1265,8 +1270,8 @@ namespace {
 template <typename M>
 struct Evaluator<Determinant<M>> {
   Mat33ExprVar<M> m;
-  Evaluator<decltype(genDeterminant(m.dual()))>
-    result{genDeterminant(m.dual())};
+  Evaluator<decltype(genDeterminant(expr(m.dual())).expr)>
+    result{genDeterminant(expr(m.dual())).expr};
 
   Evaluator(const Determinant<M> &expr)
   : m(expr.m)

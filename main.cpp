@@ -466,22 +466,6 @@ struct Mat33Div {
 
 namespace {
 template <typename A,typename B>
-static void addDeriv(const ScalarDiv<A,B> &expr,float dresult)
-{
-  float aval = evaluate(expr.a);
-  float bval = evaluate(expr.b);
-  float da = 0;
-  float db = 0;
-
-  ddiv(dual(aval,da),dual(bval,db),dresult);
-  addDeriv(expr.a, da);
-  addDeriv(expr.b, db);
-}
-}
-
-
-namespace {
-template <typename A,typename B>
 static Mat33Expr<Mat33Div<A,B>> operator/(Mat33Expr<A> a,ScalarExpr<B> b)
 {
   return {{a.expr,b.expr}};
@@ -853,7 +837,7 @@ struct Evaluator<Mat33Div<A,B>> {
 
     for (int i=0; i!=3; ++i) {
       for (int j=0; j!=3; ++j) {
-        ::addDeriv(expr(a[i][j])/expr(b),deriv[i][j]);
+        ddiv(a[i][j],b,deriv[i][j]);
       }
     }
 

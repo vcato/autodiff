@@ -603,9 +603,9 @@ struct Evaluator<DualVec3> {
 
   void addDeriv(const FloatVec3& deriv) const
   {
-    ::addDeriv(expr.x(),deriv.x());
-    ::addDeriv(expr.y(),deriv.y());
-    ::addDeriv(expr.z(),deriv.z());
+    expr.x().deriv += deriv.x();
+    expr.y().deriv += deriv.y();
+    expr.z().deriv += deriv.z();
   }
 };
 }
@@ -660,6 +660,7 @@ struct ScalarExprVar {
   Evaluator<M> eval;
   float _value = eval.value();
   float value() const { return _value; }
+  void addDeriv(float dvalue) { deriv += dvalue; }
   float deriv = 0;
   DualFloat dual() { return ::dual(_value,deriv); }
 
@@ -694,8 +695,8 @@ struct Evaluator<ScalarAdd<A,B>> {
 
   void addDeriv(float deriv)
   {
-    ::addDeriv(a.dual(),deriv);
-    ::addDeriv(b.dual(),deriv);
+    a.addDeriv(deriv);
+    b.addDeriv(deriv);
   }
 };
 }
@@ -719,8 +720,8 @@ struct Evaluator<ScalarSub<A,B>> {
 
   void addDeriv(float deriv)
   {
-    ::addDeriv(a.dual(),deriv);
-    ::addDeriv(b.dual(),-deriv);
+    a.addDeriv(deriv);
+    b.addDeriv(-deriv);
   }
 };
 }
@@ -745,8 +746,8 @@ struct Evaluator<ScalarMul<A,B>> {
 
   void addDeriv(float deriv)
   {
-    ::addDeriv(a.dual(),deriv*b.value());
-    ::addDeriv(b.dual(),deriv*a.value());
+    a.addDeriv(deriv*b.value());
+    b.addDeriv(deriv*a.value());
   }
 };
 }
@@ -773,8 +774,8 @@ struct Evaluator<ScalarDiv<A,B>> {
   {
     float av = a.value();
     float bv = b.value();
-    ::addDeriv(a.dual(),deriv* bv/(bv*bv));
-    ::addDeriv(b.dual(),deriv*-av/(bv*bv));
+    a.addDeriv(deriv* bv/(bv*bv));
+    b.addDeriv(deriv*-av/(bv*bv));
   }
 };
 }
@@ -823,6 +824,8 @@ struct ScalarExprVar<DualFloat> {
 
   float value() const { return evaluate(expr); }
 
+  void addDeriv(float dvalue) { expr.deriv += dvalue; }
+
   DualFloat dual() { return expr; }
 };
 }
@@ -856,6 +859,7 @@ struct Mat33ExprVar {
   Evaluator<M> eval;
   FloatMat33 _value = eval.value();
   FloatMat33 value() const { return _value; }
+  void addDeriv(const FloatMat33 &dvalue) { deriv += dvalue; }
   FloatMat33 deriv = mat33All(0);
   DualMat33 dual() { return ::dual(_value,deriv); }
 
@@ -921,6 +925,8 @@ struct Mat33ExprVar<DualMat33> {
   }
 
   FloatMat33 value() const { return evaluate(expr); }
+
+  void addDeriv(const FloatMat33 &deriv) { ::addDeriv(expr,deriv); }
 
   DualMat33 dual() { return expr; }
 };
@@ -1036,21 +1042,6 @@ struct Transpose {
 }
 
 
-static void dtranspose(const DualMat33 &a,const FloatMat33 &dresult)
-{
-  addDeriv(a,transpose(dresult));
-}
-
-
-namespace {
-template <typename M>
-static void addDeriv(Transpose<M> transpose,const FloatMat33 &deriv)
-{
-  dtranspose(transpose.m,deriv);
-}
-}
-
-
 template <typename M>
 static Mat33Expr<Transpose<M>> transpose(const Mat33Expr<M> &m)
 {
@@ -1074,7 +1065,7 @@ struct Evaluator<Transpose<M>> {
 
   void addDeriv(const FloatMat33 &dresult)
   {
-    dtranspose(m.dual(),dresult);
+    m.addDeriv(transpose(dresult));
   }
 };
 }

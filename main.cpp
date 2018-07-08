@@ -442,63 +442,11 @@ static void ddiv(DualMat33 a,DualFloat b,const FloatMat33 &dresult);
 
 
 namespace {
-template <typename AExpr,typename BExpr>
-struct GenDiv {
-  AExpr a;
-  BExpr b;
-  using Result = decltype(evaluate(a)/evaluate(b));
-  using A = decltype(evaluate(a));
-  using B = decltype(evaluate(b));
-
-  friend auto evaluate(const GenDiv &expr)
-  {
-    return evaluate(expr.a) * evaluate(expr.b);
-  }
-};
-}
-
-
-namespace {
-template <typename AExpr,typename BExpr>
-static void
-  addDeriv(
-    const GenDiv<AExpr,BExpr> &expr,
-    typename GenDiv<AExpr,BExpr>::Result dresult
-  )
-{
-  using A = typename GenDiv<AExpr,BExpr>::A;
-  using B = typename GenDiv<AExpr,BExpr>::B;
-
-  A da = zero<A>();
-  B db = zero<B>();
-  auto aval = evaluate(expr.a);
-  auto bval = evaluate(expr.b);
-
-  ddiv(dual(aval,da),dual(bval,db),dresult);
-
-  addDeriv(expr.a,da);
-  addDeriv(expr.b,db);
-}
-}
-
-
-namespace {
 template <typename Expr>
 struct Mat33Expr {
   Expr expr;
 };
 }
-
-
-#if 1
-namespace {
-template <typename A,typename B>
-static GenDiv<A,B> operator/(A a,B b)
-{
-  return {a,b};
-}
-}
-#endif
 
 
 namespace {
@@ -1294,15 +1242,6 @@ static Mat33Expr<Inv<T>> mat33Inv(const Mat33Expr<T> &arg)
 
 
 namespace {
-static void
-  dmat33Inv(const DualMat33 &arg,const FloatMat33 &dresult)
-{
-  addDeriv(transpose(cofactorMatrix(arg))/determinant(arg),dresult);
-}
-}
-
-
-namespace {
 template <typename M>
 struct Evaluator<Inv<M>>
 {
@@ -1651,29 +1590,6 @@ static void testMat33Inv()
 }
 
 
-static void testMat33DivDeriv()
-{
-  RandomEngine random_engine(/*seed*/1);
-  FloatMat33 a = randomMat33(random_engine);
-  float b = randomFloat(-1,1,random_engine);
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      FloatMat33 dresult = mat33All(0);
-      dresult[i][j] = 1;
-      FloatMat33 da = mat33All(0);
-      float db = 0;
-      addDeriv(dual(a,da)/dual(b,db),dresult);
-      auto f = [&](){ return (a/b)[i][j]; };
-      float fdaij = finiteDeriv(f,a[i][j]);
-      assertNear(fdaij,da[i][j],1e-4);
-      float fdb = finiteDeriv(f,b);
-      assertNear(fdb,db,1e-4);
-    }
-  }
-}
-
-
 static void testCofactorDeriv()
 {
   RandomEngine random_engine(/*seed*/1);
@@ -1735,25 +1651,6 @@ static void testDeterminantDeriv()
   FloatMat33 fda = finiteDeriv(f,a);
   assertNear(da,fda,1e-4);
 }
-
-
-static void testMatInvDeriv()
-{
-  RandomEngine random_engine(/*seed*/1);
-  FloatMat33 a = randomMat33(random_engine);
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      auto f = [&](){ return mat33Inv(a)[i][j]; };
-      FloatMat33 dresult = mat33All(0);
-      dresult[i][j] = 1;
-      FloatMat33 da = mat33All(0);
-      dmat33Inv(dual(a,da),dresult);
-      FloatMat33 fda = finiteDeriv(f,a);
-      assertNear(da,fda,2e-4);
-    }
-  }
-}
 }
 
 
@@ -1774,10 +1671,8 @@ int main()
   // tests::testAddingVectors();
   tests::testMatTranspose();
   tests::testMat33Inv();
-  tests::testMat33DivDeriv();
   tests::testCofactorDeriv();
   tests::testMat33CofactorMatrixDeriv();
   tests::testDDeterminant();
   tests::testDeterminantDeriv();
-  tests::testMatInvDeriv();
 }

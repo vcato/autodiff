@@ -1265,9 +1265,16 @@ static FloatMat33 operator*(const FloatMat33 &a,const FloatMat33 &b)
 
 
 template <typename T>
-static auto mat33Inv(const Mat33<T> &arg)
+static auto genMat33Inv(const T &arg)
 {
   return transpose(cofactorMatrix(arg))/determinant(arg);
+}
+
+
+template <typename T>
+static auto mat33Inv(const Mat33<T> &arg)
+{
+  return genMat33Inv(arg);
 }
 
 
@@ -1297,32 +1304,34 @@ static void
 
 namespace {
 template <typename M>
-struct Evaluator<Inv<M>> {
+struct Evaluator<Inv<M>>
+{
   Evaluator<M> m_eval;
-  FloatMat33 m;
-  // Evaluator<decltype(mat33Inv(std::declval<DualMat33>()))
+  FloatMat33 m = m_eval.value();
+  FloatMat33 dm = mat33All(0);
+  DualMat33 m_dual = dual(m,dm);
+  Evaluator<
+    decltype(genMat33Inv(expr(m_dual)).expr)
+  > result_eval{genMat33Inv(expr(m_dual)).expr};
 
-  Evaluator(const Inv<M> &expr)
-  : m_eval(expr.m),
-    m(m_eval.value())
+  Evaluator(const Inv<M> &expr_arg)
+  : m_eval(expr_arg.m)
   {
   }
 
   FloatMat33 value() const
   {
-    return mat33Inv(m);
+    return result_eval.value();
   }
 
   void addDeriv(const FloatMat33 &dresult)
   {
-#if 1
-    FloatMat33 dm = mat33All(0);
-    dmat33Inv(dual(m,dm),dresult);
+    result_eval.addDeriv(dresult);
+  }
+
+  ~Evaluator()
+  {
     m_eval.addDeriv(dm);
-#else
-    DerivEvaluator<Inv<M>> deval(*this);
-    deval.addDeriv(dresult);
-#endif
   }
 };
 }

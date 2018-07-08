@@ -57,15 +57,6 @@ struct ScalarExpr {
 
 
 namespace {
-template <typename Expr>
-static float evaluate(const ScalarExpr<Expr> &expr)
-{
-  return evaluate(expr.expr);
-}
-}
-
-
-namespace {
 template <typename Self>
 struct RowRef {
   Self &self;
@@ -86,6 +77,7 @@ static auto row(Self &arg,int i)
   return RowRef<Self>{arg,i};
 }
 }
+
 
 namespace {
 template <typename T>
@@ -190,15 +182,6 @@ struct ScalarAdd {
 }
 
 
-namespace {
-template <typename A,typename B>
-static float evaluate(const ScalarAdd<A,B> &expr)
-{
-  return evaluate(expr.a) + evaluate(expr.b);
-}
-}
-
-
 template <typename A,typename B>
 static ScalarExpr<ScalarAdd<A,B>>
   operator+(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
@@ -213,15 +196,6 @@ struct ScalarSub {
   A a;
   B b;
 };
-}
-
-
-namespace {
-template <typename A,typename B>
-static float evaluate(const ScalarSub<A,B> &expr)
-{
-  return evaluate(expr.a) - evaluate(expr.b);
-}
 }
 
 
@@ -242,30 +216,29 @@ struct ScalarMul {
 }
 
 
-namespace {
-template <typename A,typename B>
-static float evaluate(const ScalarMul<A,B> &expr)
-{
-  return evaluate(expr.a)*evaluate(expr.b);
-}
-}
-
-
-namespace {
-template <typename A,typename B>
-static void addDeriv(const ScalarMul<A,B> &expr,float dresult)
-{
-  addDeriv(expr.a, dresult*evaluate(expr.b));
-  addDeriv(expr.b, dresult*evaluate(expr.a));
-}
-}
-
-
 template <typename A,typename B>
 static ScalarExpr<ScalarMul<A,B>>
   operator*(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
 {
   return {{a.expr,b.expr}};
+}
+
+
+namespace {
+template <typename A,typename B>
+struct ScalarDiv {
+  A a;
+  B b;
+};
+}
+
+
+namespace {
+template <typename A,typename B>
+static ScalarExpr<ScalarDiv<A,B>> operator/(ScalarExpr<A> a,ScalarExpr<B> b)
+{
+  return {{a.expr,b.expr}};
+}
 }
 
 
@@ -278,32 +251,6 @@ static FloatMat33 mat33All(float arg)
   };
 
   return FloatMat33(values);
-}
-
-
-template <typename T> static T zero();
-
-template <>
-Mat33<float> zero<Mat33<float>>()
-{
-  return mat33All(0);
-}
-
-
-template <>
-float zero<float>()
-{
-  return 0;
-}
-
-
-static void ddiv(DualFloat a_arg,DualFloat b_arg,float dresult)
-{
-  // d(a/b) = (b*da - a*db)/(b*b);
-  float b = evaluate(b_arg);
-  float a = evaluate(a_arg);
-  addDeriv(a_arg,dresult* b/(b*b));
-  addDeriv(b_arg,dresult*-a/(b*b));
 }
 
 
@@ -346,29 +293,6 @@ static FloatVec3 evaluate(const DualVec3 &dual)
   float y = evaluate(dual.y());
   float z = evaluate(dual.z());
   return FloatVec3{x,y,z};
-}
-}
-
-
-namespace {
-template <typename X,typename Y,typename Z>
-static void addDeriv(Vec3Func<X,Y,Z> f,const FloatVec3 &deriv)
-{
-  addDeriv(f.x,deriv.x);
-  addDeriv(f.y,deriv.y);
-  addDeriv(f.z,deriv.z);
-}
-}
-
-
-namespace {
-template <typename X,typename Y,typename Z>
-static FloatVec3 evaluate(Vec3Func<X,Y,Z> f)
-{
-  float x = evaluate(f.x);
-  float y = evaluate(f.y);
-  float z = evaluate(f.z);
-  return {x,y,z};
 }
 }
 
@@ -422,15 +346,6 @@ struct Mat33Expr<DualMat33> {
 
 namespace {
 template <typename A,typename B>
-struct ScalarDiv {
-  A a;
-  B b;
-};
-}
-
-
-namespace {
-template <typename A,typename B>
 struct Mat33Div {
   A a;
   B b;
@@ -441,15 +356,6 @@ struct Mat33Div {
 namespace {
 template <typename A,typename B>
 static Mat33Expr<Mat33Div<A,B>> operator/(Mat33Expr<A> a,ScalarExpr<B> b)
-{
-  return {{a.expr,b.expr}};
-}
-}
-
-
-namespace {
-template <typename A,typename B>
-static ScalarExpr<ScalarDiv<A,B>> operator/(ScalarExpr<A> a,ScalarExpr<B> b)
 {
   return {{a.expr,b.expr}};
 }
@@ -849,29 +755,26 @@ struct Evaluator<ScalarMul<A,B>> {
 namespace {
 template <typename A,typename B>
 struct Evaluator<ScalarDiv<A,B>> {
-  Evaluator<A> a_eval;
-  Evaluator<B> b_eval;
-  float a = a_eval.value();
-  float b = b_eval.value();
+  ScalarExprVar<A> a;
+  ScalarExprVar<B> b;
 
   Evaluator(ScalarDiv<A,B> expr)
-  : a_eval(expr.a),
-    b_eval(expr.b)
+  : a(expr.a),
+    b(expr.b)
   {
   }
 
   float value() const
   {
-    return a/b;
+    return a.value() / b.value();
   }
 
   void addDeriv(float deriv)
   {
-    float da = 0;
-    float db = 0;
-    ddiv(dual(a,da),dual(b,db),deriv);
-    a_eval.addDeriv(da);
-    b_eval.addDeriv(db);
+    float av = a.value();
+    float bv = b.value();
+    ::addDeriv(a.dual(),deriv* bv/(bv*bv));
+    ::addDeriv(b.dual(),deriv*-av/(bv*bv));
   }
 };
 }
@@ -1050,11 +953,48 @@ struct Evaluator<Cofactor<M>> {
 }
 
 
+template <typename T>
+static Mat33<T> mat33(const T (&values)[3][3])
+{
+  return Mat33<T>(values);
+}
+
+
+template <typename T>
+static Mat33Expr<Mat33<T>> mat33(const ScalarExpr<T> (&arg)[3][3])
+{
+  T values[3][3] = {
+    {arg[0][0].expr,arg[0][1].expr,arg[0][2].expr},
+    {arg[1][0].expr,arg[1][1].expr,arg[1][2].expr},
+    {arg[2][0].expr,arg[2][1].expr,arg[2][2].expr},
+  };
+
+  return {{values}};
+}
+
+
+namespace {
+template <typename A,typename B>
+static auto genMat33Div(const A& a,const B& b)
+{
+  decltype(a[0][0]/b) values[3][3] = {
+    { a[0][0]/b, a[0][1]/b, a[0][2]/b },
+    { a[1][0]/b, a[1][1]/b, a[1][2]/b },
+    { a[2][0]/b, a[2][1]/b, a[2][2]/b }
+  };
+
+  return mat33(values);
+}
+}
+
+
 namespace {
 template <typename A,typename B>
 struct Evaluator<Mat33Div<A,B>> {
   Mat33ExprVar<A> a;
   ScalarExprVar<B> b;
+  Evaluator<decltype(genMat33Div(expr(a.dual()),expr(b.dual())).expr)>
+    result{ genMat33Div(expr(a.dual()),expr(b.dual())).expr };
 
   Evaluator(const Mat33Div<A,B> &expr)
   : a(expr.a),
@@ -1064,16 +1004,12 @@ struct Evaluator<Mat33Div<A,B>> {
 
   FloatMat33 value() const
   {
-    return a.value() / b.value();
+    return result.value();
   }
 
   void addDeriv(const FloatMat33 &deriv)
   {
-    for (int i=0; i!=3; ++i) {
-      for (int j=0; j!=3; ++j) {
-        ddiv(a.dual()[i][j],b.dual(),deriv[i][j]);
-      }
-    }
+    result.addDeriv(deriv);
   }
 };
 }
@@ -1149,26 +1085,6 @@ static ScalarExpr<Cofactor<M>>
   cofactor(const Mat33Expr<M> &arg,int i,int j)
 {
   return {{arg.expr,i,j}};
-}
-
-
-template <typename T>
-static Mat33<T> mat33(const T (&values)[3][3])
-{
-  return Mat33<T>(values);
-}
-
-
-template <typename T>
-static Mat33Expr<Mat33<T>> mat33(const ScalarExpr<T> (&arg)[3][3])
-{
-  T values[3][3] = {
-    {arg[0][0].expr,arg[0][1].expr,arg[0][2].expr},
-    {arg[1][0].expr,arg[1][1].expr,arg[1][2].expr},
-    {arg[2][0].expr,arg[2][1].expr,arg[2][2].expr},
-  };
-
-  return {{values}};
 }
 
 
@@ -1294,15 +1210,7 @@ struct Evaluator<Determinant<M>> {
 namespace {
 static FloatMat33 operator/(const FloatMat33 &a,float b)
 {
-  float values[3][3];
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      values[i][j] = a[i][j]/b;
-    }
-  }
-
-  return FloatMat33(values);
+  return genMat33Div(a,b);
 }
 }
 

@@ -820,11 +820,33 @@ static void dcofactor(const DualMat33 &arg,int i,int j,float dresult)
 
 namespace {
 template <typename M>
+struct ScalarExprVar {
+  Evaluator<M> eval;
+  float value = eval.value();
+  float deriv = 0;
+  DualFloat dual() { return ::dual(value,deriv); }
+
+  ScalarExprVar(const M &m)
+  : eval(m)
+  {
+  }
+
+  ~ScalarExprVar()
+  {
+    eval.addDeriv(deriv);
+  }
+};
+}
+
+
+
+namespace {
+template <typename M>
 struct Mat33ExprVar {
   Evaluator<M> eval;
   FloatMat33 value = eval.value();
   FloatMat33 deriv = mat33All(0);
-  DualMat33 dual = ::dual(value,deriv);
+  DualMat33 dual() { return ::dual(value,deriv); }
 
   Mat33ExprVar(const M &m)
   : eval(m)
@@ -860,32 +882,10 @@ struct Evaluator<Cofactor<M>> {
 
   void addDeriv(float dresult)
   {
-    dcofactor(m.dual,i,j,dresult);
+    dcofactor(m.dual(),i,j,dresult);
   }
 };
 }
-
-
-namespace {
-template <typename M>
-struct ScalarExprVar {
-  Evaluator<M> eval;
-  float value = eval.value();
-  float deriv = 0;
-  DualFloat dual = ::dual(value,deriv);
-
-  ScalarExprVar(const M &m)
-  : eval(m)
-  {
-  }
-
-  ~ScalarExprVar()
-  {
-    eval.addDeriv(deriv);
-  }
-};
-}
-
 
 
 namespace {
@@ -909,7 +909,7 @@ struct Evaluator<Mat33Div<A,B>> {
   {
     for (int i=0; i!=3; ++i) {
       for (int j=0; j!=3; ++j) {
-        ddiv(a.dual[i][j],b.dual,deriv[i][j]);
+        ddiv(a.dual()[i][j],b.dual(),deriv[i][j]);
       }
     }
   }
@@ -1058,7 +1058,7 @@ struct Evaluator<Transpose<M>> {
 
   void addDeriv(const FloatMat33 &dresult)
   {
-    dtranspose(m.dual,dresult);
+    dtranspose(m.dual(),dresult);
   }
 };
 }
@@ -1129,7 +1129,7 @@ struct Evaluator<CofactorMatrixFunc<M>> {
 
   void addDeriv(const FloatMat33 &dresult)
   {
-    dcofactorMatrix(m.dual,dresult);
+    dcofactorMatrix(m.dual(),dresult);
   }
 };
 }
@@ -1204,7 +1204,7 @@ struct Evaluator<Determinant<M>> {
 
   void addDeriv(float dresult)
   {
-    ddeterminant(m.dual,dresult);
+    ddeterminant(m.dual(),dresult);
   }
 };
 }
@@ -1288,8 +1288,8 @@ struct Evaluator<Inv<M>>
 {
   Mat33ExprVar<M> m;
   Evaluator<
-    decltype(genMat33Inv(expr(m.dual)).expr)
-  > result_eval{genMat33Inv(expr(m.dual)).expr};
+    decltype(genMat33Inv(expr(m.dual())).expr)
+  > result_eval{genMat33Inv(expr(m.dual())).expr};
 
   Evaluator(const Inv<M> &expr_arg)
   : m(expr_arg.m)

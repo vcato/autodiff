@@ -52,6 +52,14 @@ static float evaluate(const DualFloat &dual)
 
 
 namespace {
+static void addDeriv(const DualFloat &dual,float dresult)
+{
+  dual.deriv += dresult;
+}
+}
+
+
+namespace {
 template <typename Expr>
 struct ScalarExpr {
   Expr expr;
@@ -183,72 +191,7 @@ struct ScalarExprVar {
 
 
 using FloatMat33 = Mat33<float>;
-
-namespace {
-template <typename Expr>
-struct Mat33Expr {
-  Expr expr;
-};
-}
-
-
-namespace {
-struct DualMat33 {
-  const FloatMat33 &value;
-  FloatMat33 &deriv;
-};
-}
-
-
-namespace {
-template <>
-struct Mat33Expr<DualMat33> {
-  DualMat33 expr;
-
-  template <typename Self>
-  static auto element(Self &arg,int i,int j)
-  {
-    assert(i>=0);
-    assert(i<3);
-    assert(j>=0);
-    assert(j<3);
-    return ScalarExpr<DualFloat>{
-      dual( arg.expr.value[i][j], arg.expr.deriv[i][j] )
-    };
-  }
-
-  auto operator[](int i)             { return row(*this,i); }
-  auto operator[](int i) const       { return row(*this,i); }
-};
-}
-
-
-static DualMat33 dual(const FloatMat33 &v,FloatMat33 &dv)
-{
-  return DualMat33{v,dv};
-}
-
-
-namespace {
-static FloatMat33 evaluate(const DualMat33 &d)
-{
-  return d.value;
-}
-}
-
-
-namespace {
-static void addDeriv(DualMat33 &d,const FloatMat33 &deriv)
-{
-  d.deriv += deriv;
-}
-}
-
-
-static Mat33Expr<DualMat33> expr(const DualMat33 d)
-{
-  return {d};
-}
+using DualMat33 = Mat33<DualFloat>;
 
 
 namespace {
@@ -459,6 +402,47 @@ static FloatVec3 evaluate(const DualVec3 &dual)
 static DualVec3 dual(FloatVec3 v,FloatVec3 &dv)
 {
   return {{v.x(),dv.x()},{v.y(),dv.y()},{v.z(),dv.z()}};
+}
+
+
+static DualMat33 dual(Mat33<float> v,Mat33<float> &dv)
+{
+  DualFloat values[3][3] = {
+    {dual(v[0][0],dv[0][0]),dual(v[0][1],dv[0][1]),dual(v[0][2],dv[0][2])},
+    {dual(v[1][0],dv[1][0]),dual(v[1][1],dv[1][1]),dual(v[1][2],dv[1][2])},
+    {dual(v[2][0],dv[2][0]),dual(v[2][1],dv[2][1]),dual(v[2][2],dv[2][2])},
+  };
+
+  return DualMat33(values);
+}
+
+
+namespace {
+template <typename Expr>
+struct Mat33Expr {
+  Expr expr;
+};
+}
+
+
+namespace {
+template <>
+struct Mat33Expr<DualMat33> {
+  DualMat33 expr;
+
+  template <typename Self>
+  static auto element(Self &arg,int i,int j)
+  {
+    assert(i>=0);
+    assert(i<3);
+    assert(j>=0);
+    assert(j<3);
+    return ScalarExpr<DualFloat>{arg.expr[i][j]};
+  }
+
+  auto operator[](int i)             { return row(*this,i); }
+  auto operator[](int i) const       { return row(*this,i); }
+};
 }
 
 
@@ -972,10 +956,9 @@ template <typename M>
 struct Mat33ExprVar {
   Evaluator<M> eval;
   FloatMat33 _value = eval.value();
-  FloatMat33 deriv = zeroMat33();
-
   FloatMat33 value() const { return _value; }
   void addDeriv(const FloatMat33 &dvalue) { deriv += dvalue; }
+  FloatMat33 deriv = zeroMat33();
   DualMat33 dual() { return ::dual(_value,deriv); }
 
   Mat33ExprVar(const M &m)
@@ -1706,17 +1689,16 @@ static void testMat33Evaluator()
   FloatMat33 dmat = zeroMat33();
   DualMat33 m = dual(mat,dmat);
   using Element = ScalarAdd<DualFloat,float>;
-
   Element values[3][3] = {
-    {(expr(m)[0][0] + expr(1)).expr,
-     (expr(m)[0][1] + expr(1)).expr,
-     (expr(m)[0][2] + expr(1)).expr},
-    {(expr(m)[1][0] + expr(1)).expr,
-     (expr(m)[1][1] + expr(1)).expr,
-     (expr(m)[1][2] + expr(1)).expr},
-    {(expr(m)[2][0] + expr(1)).expr,
-     (expr(m)[2][1] + expr(1)).expr,
-     (expr(m)[2][2] + expr(1)).expr},
+    {(expr(m[0][0]) + expr(1)).expr,
+     (expr(m[0][1]) + expr(1)).expr,
+     (expr(m[0][2]) + expr(1)).expr},
+    {(expr(m[1][0]) + expr(1)).expr,
+     (expr(m[1][1]) + expr(1)).expr,
+     (expr(m[1][2]) + expr(1)).expr},
+    {(expr(m[2][0]) + expr(1)).expr,
+     (expr(m[2][1]) + expr(1)).expr,
+     (expr(m[2][2]) + expr(1)).expr},
   };
 
   auto e = expr(Mat33<Element>(values));

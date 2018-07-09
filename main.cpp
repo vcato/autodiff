@@ -15,6 +15,11 @@ using std::max;
 
 
 namespace {
+template <typename Expr> struct Evaluator;
+}
+
+
+namespace {
 template <typename X,typename Y,typename Z>
 struct Vec3Func {
   X x;
@@ -29,6 +34,12 @@ struct DualFloat {
   float value;
   float &deriv;
 };
+}
+
+
+static DualFloat dual(float av,float &da)
+{
+  return {av,da};
 }
 
 
@@ -156,6 +167,29 @@ static Mat33<float> evaluate(const Mat33<T> &m)
 }
 
 
+namespace {
+template <typename M>
+struct ScalarExprVar {
+  Evaluator<M> eval;
+  float _value = eval.value();
+  float value() const { return _value; }
+  void addDeriv(float dvalue) { deriv += dvalue; }
+  float deriv = 0;
+  DualFloat dual() { return ::dual(_value,deriv); }
+
+  ScalarExprVar(const M &m)
+  : eval(m)
+  {
+  }
+
+  ~ScalarExprVar()
+  {
+    eval.addDeriv(deriv);
+  }
+};
+}
+
+
 using FloatMat33 = Mat33<float>;
 using DualMat33 = Mat33<DualFloat>;
 
@@ -242,6 +276,80 @@ static ScalarExpr<ScalarDiv<A,B>> operator/(ScalarExpr<A> a,ScalarExpr<B> b)
 }
 
 
+namespace {
+template <typename A>
+struct Cos {
+  A a;
+};
+}
+
+
+namespace {
+template <typename A>
+static ScalarExpr<Cos<A>> cos(ScalarExpr<A> a)
+{
+  return {{a.expr}};
+}
+}
+
+
+namespace {
+template <typename A>
+struct Evaluator<Cos<A>> {
+  ScalarExprVar<A> a;
+
+  Evaluator(const Cos<A> &expr)
+  : a(expr.a)
+  {
+  }
+
+  float value() const { return cosf(a.value()); }
+
+  void addDeriv(float dvalue)
+  {
+    a.addDeriv(dvalue*-sinf(a.value()));
+  }
+};
+}
+
+
+namespace {
+template <typename A>
+struct Sin {
+  A a;
+};
+}
+
+
+namespace {
+template <typename A>
+static ScalarExpr<Sin<A>> sin(ScalarExpr<A> a)
+{
+  return {{a.expr}};
+}
+}
+
+
+namespace {
+template <typename A>
+struct Evaluator<Sin<A>> {
+  ScalarExprVar<A> a;
+
+  Evaluator(const Sin<A> &expr)
+  : a(expr.a)
+  {
+  }
+
+  float value() const { return sinf(a.value()); }
+
+  void addDeriv(float dvalue)
+  {
+    a.addDeriv(dvalue*cosf(a.value()));
+  }
+};
+}
+
+
 static FloatMat33 mat33All(float arg)
 {
   float values[3][3] = {
@@ -251,12 +359,6 @@ static FloatMat33 mat33All(float arg)
   };
 
   return FloatMat33(values);
-}
-
-
-static DualFloat dual(float av,float &da)
-{
-  return {av,da};
 }
 
 
@@ -362,6 +464,24 @@ static Mat33Expr<Mat33Div<A,B>> operator/(Mat33Expr<A> a,ScalarExpr<B> b)
 }
 
 
+namespace {
+template <typename A,typename B>
+struct Mat33Mul {
+  A a;
+  B b;
+};
+}
+
+
+namespace {
+template <typename A,typename B>
+static Mat33Expr<Mat33Mul<A,B>> operator*(Mat33Expr<A> a,Mat33Expr<B> b)
+{
+  return {{a.expr,b.expr}};
+}
+}
+
+
 static ScalarExpr<DualFloat> expr(const DualFloat &expr)
 {
   return {{expr}};
@@ -397,10 +517,16 @@ static float finiteDeriv(Function f,float &v)
 }
 
 
+static FloatMat33 zeroMat33()
+{
+  return mat33All(0);
+}
+
+
 template <typename Function>
 static FloatMat33 finiteDeriv(Function f,FloatMat33 &m)
 {
-  FloatMat33 result = mat33All(0);
+  FloatMat33 result = zeroMat33();
 
   for (int i=0; i!=3; ++i) {
     for (int j=0; j!=3; ++j) {
@@ -546,11 +672,6 @@ static ScalarExpr<Dot<A,B>> dot(Vec3Expr<A> a,Vec3Expr<B> b)
 
 
 namespace {
-template <typename Expr> struct Evaluator;
-}
-
-
-namespace {
 template <>
 struct Evaluator<float> {
   float expr;
@@ -649,29 +770,6 @@ struct Evaluator<Mat33<T>> {
         m_eval[i][j].addDeriv(deriv[i][j]);
       }
     }
-  }
-};
-}
-
-
-namespace {
-template <typename M>
-struct ScalarExprVar {
-  Evaluator<M> eval;
-  float _value = eval.value();
-  float value() const { return _value; }
-  void addDeriv(float dvalue) { deriv += dvalue; }
-  float deriv = 0;
-  DualFloat dual() { return ::dual(_value,deriv); }
-
-  ScalarExprVar(const M &m)
-  : eval(m)
-  {
-  }
-
-  ~ScalarExprVar()
-  {
-    eval.addDeriv(deriv);
   }
 };
 }
@@ -860,7 +958,7 @@ struct Mat33ExprVar {
   FloatMat33 _value = eval.value();
   FloatMat33 value() const { return _value; }
   void addDeriv(const FloatMat33 &dvalue) { deriv += dvalue; }
-  FloatMat33 deriv = mat33All(0);
+  FloatMat33 deriv = zeroMat33();
   DualMat33 dual() { return ::dual(_value,deriv); }
 
   Mat33ExprVar(const M &m)
@@ -1206,6 +1304,7 @@ static FloatMat33 operator/(const FloatMat33 &a,float b)
 }
 
 
+namespace {
 static FloatMat33 operator*(const FloatMat33 &a,const FloatMat33 &b)
 {
   float values[3][3];
@@ -1223,6 +1322,43 @@ static FloatMat33 operator*(const FloatMat33 &a,const FloatMat33 &b)
   }
 
   return FloatMat33(values);
+}
+}
+
+
+namespace {
+template <typename A,typename B>
+struct Evaluator<Mat33Mul<A,B>> {
+  Mat33ExprVar<A> a;
+  Mat33ExprVar<B> b;
+
+  Evaluator(const Mat33Mul<A,B> &expr)
+  : a(expr.a), b(expr.b)
+  {
+  }
+
+  FloatMat33 value() const { return a.value() * b.value(); }
+
+  void addDeriv(const FloatMat33 &dvalue)
+  {
+    FloatMat33 da = zeroMat33();
+    FloatMat33 db = zeroMat33();
+    FloatMat33 av = a.value();
+    FloatMat33 bv = b.value();
+
+    for (int i=0; i!=3; ++i) {
+      for (int j=0; j!=3; ++j) {
+        for (int k=0; k!=3; ++k) {
+          da[i][k] += dvalue[i][j]*bv[k][j];
+          db[k][j] += dvalue[i][j]*av[i][k];
+        }
+      }
+    }
+
+    a.addDeriv(da);
+    b.addDeriv(db);
+  }
+};
 }
 
 
@@ -1311,6 +1447,83 @@ static Vec3Expr<Vec3Func<A,B,C>>
   auto f = Vec3Func<A,B,C>{a.expr,b.expr,c.expr};
   return Vec3Expr<Vec3Func<A,B,C>>{f};
 }
+
+
+namespace {
+template <typename Angle>
+struct RotX {
+  Angle angle;
+};
+}
+
+
+template <typename Angle>
+static Mat33Expr<RotX<Angle>> rotX(ScalarExpr<Angle> angle)
+{
+  return {{angle.expr}};
+}
+
+
+static FloatMat33 rotX(float sina,float cosa)
+{
+  float values[3][3] = {
+    {1,     0,    0},
+    {0,  cosa, sina},
+    {0, -sina, cosa}
+  };
+
+  return mat33(values);
+}
+
+static FloatMat33 rotX(float angle)
+{
+  return rotX(sinf(angle),cosf(angle));
+}
+
+
+namespace {
+template <typename Angle>
+struct Evaluator<RotX<Angle>> {
+  ScalarExprVar<Angle> angle;
+  ScalarExprVar<Cos<Angle>> cosa;
+  ScalarExprVar<Sin<Angle>> sina;
+
+  Evaluator(const RotX<Angle> &expr)
+  : angle(expr.angle),
+    cosa(cos(::expr(angle.dual())).expr),
+    sina(sin(::expr(angle.dual())).expr)
+  {
+  }
+
+  FloatMat33 value() const
+  {
+    return rotX(sina.value(),cosa.value());
+  }
+
+  void addDeriv(const FloatMat33 &dvalue)
+  {
+    cosa.addDeriv( dvalue[1][1]);
+    sina.addDeriv( dvalue[1][2]);
+    sina.addDeriv(-dvalue[2][1]);
+    cosa.addDeriv( dvalue[2][2]);
+  }
+};
+}
+
+
+static float weightedSum(const FloatMat33 &m,const FloatMat33 &w)
+{
+  float result = 0;
+
+  for (int i=0; i!=3; ++i) {
+    for (int j=0; j!=3; ++j) {
+      result += m[i][j]*w[i][j];
+    }
+  }
+
+  return result;
+}
+
 
 namespace tests {
 
@@ -1412,6 +1625,32 @@ static void testScalarDivEvaluator()
 }
 
 
+static void testCosEvaluator()
+{
+  RandomEngine random_engine(/*seed*/1);
+  float a = randomFloat(-M_PI,M_PI,random_engine);
+  float da = 0;
+  float dresult = randomFloat(-1,1,random_engine);
+  float result = evalAndAddDeriv(cos(expr(dual(a,da))),dresult);
+  assert(result==cosf(a));
+  auto f = [&]{ return cosf(a); };
+  assertNear(da,finiteDeriv(f,a),.005);
+}
+
+
+static void testSinEvaluator()
+{
+  RandomEngine random_engine(/*seed*/1);
+  float a = randomFloat(-M_PI,M_PI,random_engine);
+  float da = 0;
+  float dresult = randomFloat(-1,1,random_engine);
+  float result = evalAndAddDeriv(sin(expr(dual(a,da))),dresult);
+  assert(result==sinf(a));
+  auto f = [&]{ return sinf(a); };
+  assertNear(da,finiteDeriv(f,a),.005);
+}
+
+
 static void testDualVec3Evaluator()
 {
   FloatVec3 a{1,2,3};
@@ -1430,7 +1669,7 @@ static void testCofactorEvaluator()
 
   for (int i=0; i!=3; ++i) {
     for (int j=0; j!=3; ++j) {
-      FloatMat33 dmat = mat33All(0);
+      FloatMat33 dmat = zeroMat33();
       DualMat33 dual_mat = dual(mat,dmat);
       float dresult = 1;
       float result = evalAndAddDeriv(cofactor(expr(dual_mat),i,j),dresult);
@@ -1447,7 +1686,7 @@ static void testMat33Evaluator()
 {
   RandomEngine random_engine(/*seed*/1);
   FloatMat33 mat = randomMat33(random_engine);
-  FloatMat33 dmat = mat33All(0);
+  FloatMat33 dmat = zeroMat33();
   DualMat33 m = dual(mat,dmat);
   using Element = ScalarAdd<DualFloat,float>;
   Element values[3][3] = {
@@ -1475,20 +1714,11 @@ static void testCofactorMatrixEvaluator()
 {
   RandomEngine random_engine(/*seed*/1);
   FloatMat33 mat = randomMat33(random_engine);
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      FloatMat33 dmat = mat33All(0);
-      FloatMat33 dresult = mat33All(0);
-      dresult[i][j] = 1;
-
-      FloatMat33 result =
-        evalAndAddDeriv(cofactorMatrix(expr(dual(mat,dmat))),dresult);
-      auto f = [&]{ return cofactorMatrix(mat)[i][j]; };
-      assert(result[i][j]==f());
-      assertNear(dmat,finiteDeriv(f,mat),1e-4);
-    }
-  }
+  FloatMat33 dmat = zeroMat33();
+  FloatMat33 dresult = randomMat33(random_engine);
+  evalAndAddDeriv(cofactorMatrix(expr(dual(mat,dmat))),dresult);
+  auto f = [&]{ return weightedSum(cofactorMatrix(mat),dresult); };
+  assertNear(dmat,finiteDeriv(f,mat),2e-4);
 }
 
 
@@ -1496,7 +1726,7 @@ static void testDeterminantEvaluator()
 {
   RandomEngine random_engine(/*seed*/1);
   FloatMat33 mat = randomMat33(random_engine);
-  FloatMat33 dmat = mat33All(0);
+  FloatMat33 dmat = zeroMat33();
   float dresult = 1;
   float result = evalAndAddDeriv(determinant(expr(dual(mat,dmat))),dresult);
   auto f = [&]{ return determinant(mat); };
@@ -1509,19 +1739,12 @@ static void testTransposeEvaluator()
 {
   RandomEngine random_engine(/*seed*/1);
   FloatMat33 mat = randomMat33(random_engine);
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      FloatMat33 dmat = mat33All(0);
-      FloatMat33 dresult = mat33All(0);
-      dresult[i][j] = 1;
-      FloatMat33 result =
-        evalAndAddDeriv(transpose(expr(dual(mat,dmat))),dresult);
-      auto f = [&]{ return transpose(mat)[i][j]; };
-      assert(result[i][j]==f());
-      assertNear(dmat,finiteDeriv(f,mat),1e-4);
-    }
-  }
+  FloatMat33 dmat = zeroMat33();
+  FloatMat33 dresult = randomMat33(random_engine);
+  FloatMat33 result = evalAndAddDeriv(transpose(expr(dual(mat,dmat))),dresult);
+  assertNear(result,transpose(mat),0);
+  auto f = [&]{ return weightedSum(transpose(mat),dresult); };
+  assertNear(dmat,finiteDeriv(f,mat),2e-4);
 }
 
 
@@ -1532,14 +1755,14 @@ static void testMat33DivEvaluator()
   float divisor = randomFloat(-1,1,random_engine);
   float ddivisor = 0;
 
-  FloatMat33 dmat = mat33All(0);
-  FloatMat33 dresult = mat33All(0);
-  dresult[0][0] = 1;
+  FloatMat33 dmat = zeroMat33();
+  FloatMat33 dresult = randomMat33(random_engine);
   auto e = expr(dual(mat,dmat))/expr(dual(divisor,ddivisor));
   FloatMat33 result = evalAndAddDeriv(e,dresult);
-  auto f = [&]{ return (mat/divisor)[0][0]; };
-  assert(result[0][0]==f());
+  auto f = [&]{ return weightedSum(mat/divisor,dresult); };
+  assertNear(result,mat/divisor,0);
   assertNear(dmat,finiteDeriv(f,mat),1e-4);
+  assertNear(ddivisor,finiteDeriv(f,divisor),1e-4);
 }
 
 
@@ -1548,18 +1771,13 @@ static void testMat33InvEvaluator()
   RandomEngine random_engine(/*seed*/1);
   FloatMat33 mat = randomMat33(random_engine);
 
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      FloatMat33 dmat = mat33All(0);
-      FloatMat33 dresult = mat33All(0);
-      dresult[i][j] = 1;
-      FloatMat33 result =
-        evalAndAddDeriv(mat33Inv(expr(dual(mat,dmat))),dresult);
-      auto f = [&]{ return mat33Inv(mat)[i][j]; };
-      assert(result[i][j]==f());
-      assertNear(dmat,finiteDeriv(f,mat),2e-4);
-    }
-  }
+  FloatMat33 dmat = zeroMat33();
+  FloatMat33 dresult = randomMat33(random_engine);
+  FloatMat33 result =
+    evalAndAddDeriv(mat33Inv(expr(dual(mat,dmat))),dresult);
+  auto f = [&]{ return weightedSum(mat33Inv(mat),dresult); };
+  assertNear(result,mat33Inv(mat),0);
+  assertNear(dmat,finiteDeriv(f,mat),1e-3);
 }
 
 
@@ -1578,6 +1796,33 @@ static void testDotEvaluator()
   assert(result==f());
   assertNear(da,finiteDeriv(f,a),1e-4);
   assertNear(db,finiteDeriv(f,b),1e-4);
+}
+
+
+static void testMat33MulEvaluator()
+{
+  RandomEngine random_engine(/*seed*/1);
+  FloatMat33 a = randomMat33(random_engine);
+  FloatMat33 b = randomMat33(random_engine);
+  FloatMat33 da = zeroMat33();
+  FloatMat33 db = zeroMat33();
+  FloatMat33 dresult = randomMat33(random_engine);
+  evalAndAddDeriv(expr(dual(a,da))*expr(dual(b,db)),dresult);
+  auto f = [&]{ return weightedSum(a*b,dresult); };
+  assertNear(da,finiteDeriv(f,a),1e-4);
+  assertNear(db,finiteDeriv(f,b),1e-4);
+}
+
+
+static void testRotXEvaluator()
+{
+  RandomEngine random_engine(/*seed*/1);
+  float a = randomFloat(-1,1,random_engine);
+  float da = 0;
+  FloatMat33 dresult = randomMat33(random_engine);
+  evalAndAddDeriv(rotX(expr(dual(a,da))),dresult);
+  auto f = [&]{ return weightedSum(rotX(a),dresult); };
+  assertNear(da,finiteDeriv(f,a),1e-4);
 }
 
 
@@ -1621,11 +1866,15 @@ static void testAddingVectors()
 int main()
 {
   tests::testMat33Inv();
+
   tests::testScalarConstantEvaluator();
   tests::testScalarAddEvaluator();
   tests::testScalarSubEvaluator();
   tests::testScalarMulEvaluator();
   tests::testScalarDivEvaluator();
+  tests::testCosEvaluator();
+  tests::testSinEvaluator();
+
   tests::testDualVec3Evaluator();
   tests::testCofactorEvaluator();
   tests::testMat33Evaluator();
@@ -1635,6 +1884,8 @@ int main()
   tests::testMat33DivEvaluator();
   tests::testMat33InvEvaluator();
   tests::testDotEvaluator();
+  tests::testMat33MulEvaluator();
+  tests::testRotXEvaluator();
   //tests::testDot2();
   // tests::testAddingVectors();
 }

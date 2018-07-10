@@ -842,24 +842,26 @@ struct Evaluator<ScalarSub<A,B>> {
 namespace {
 template <typename A,typename B>
 struct Evaluator<ScalarMul<A,B>> {
-  ScalarExprVar<A> a;
-  ScalarExprVar<B> b;
+  Evaluator<A> a_eval;
+  float a = a_eval.value();
+  Evaluator<B> b_eval;
+  float b = b_eval.value();
 
   Evaluator(ScalarMul<A,B> expr)
-  : a(expr.a),
-    b(expr.b)
+  : a_eval(expr.a),
+    b_eval(expr.b)
   {
   }
 
   float value() const
   {
-    return a.value() * b.value();
+    return a*b;
   }
 
   void addDeriv(float deriv)
   {
-    a.addDeriv(deriv*b.value());
-    b.addDeriv(deriv*a.value());
+    a_eval.addDeriv(deriv*b);
+    b_eval.addDeriv(deriv*a);
   }
 };
 }
@@ -868,26 +870,26 @@ struct Evaluator<ScalarMul<A,B>> {
 namespace {
 template <typename A,typename B>
 struct Evaluator<ScalarDiv<A,B>> {
-  ScalarExprVar<A> a;
-  ScalarExprVar<B> b;
+  Evaluator<A> a_eval;
+  float a = a_eval.value();
+  Evaluator<B> b_eval;
+  float b = b_eval.value();
 
   Evaluator(ScalarDiv<A,B> expr)
-  : a(expr.a),
-    b(expr.b)
+  : a_eval(expr.a),
+    b_eval(expr.b)
   {
   }
 
   float value() const
   {
-    return a.value() / b.value();
+    return a/b;
   }
 
   void addDeriv(float deriv)
   {
-    float av = a.value();
-    float bv = b.value();
-    a.addDeriv(deriv* bv/(bv*bv));
-    b.addDeriv(deriv*-av/(bv*bv));
+    a_eval.addDeriv(deriv* b/(b*b));
+    b_eval.addDeriv(deriv*-a/(b*b));
   }
 };
 }

@@ -792,23 +792,23 @@ struct Evaluator<Mat33<T>> {
 namespace {
 template <typename A,typename B>
 struct Evaluator<ScalarAdd<A,B>> {
-  ScalarExprVar<A> a;
-  ScalarExprVar<B> b;
+  Evaluator<A> a_eval;
+  Evaluator<B> b_eval;
 
   Evaluator(ScalarAdd<A,B> expr)
-  : a(expr.a), b(expr.b)
+  : a_eval(expr.a), b_eval(expr.b)
   {
   }
 
   float value() const
   {
-    return a.value() + b.value();
+    return a_eval.value() + b_eval.value();
   }
 
   void addDeriv(float deriv)
   {
-    a.addDeriv(deriv);
-    b.addDeriv(deriv);
+    a_eval.addDeriv(deriv);
+    b_eval.addDeriv(deriv);
   }
 };
 }
@@ -817,8 +817,8 @@ struct Evaluator<ScalarAdd<A,B>> {
 namespace {
 template <typename A,typename B>
 struct Evaluator<ScalarSub<A,B>> {
-  ScalarExprVar<A> a;
-  ScalarExprVar<B> b;
+  Evaluator<A> a;
+  Evaluator<B> b;
 
   Evaluator(ScalarSub<A,B> expr)
   : a(expr.a), b(expr.b)

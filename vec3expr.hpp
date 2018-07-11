@@ -1,3 +1,6 @@
+#include "dualvec3.hpp"
+#include "scalarexpr.hpp"
+
 template <typename Expr>
 struct Vec3Expr {
   Expr expr;

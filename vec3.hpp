@@ -1,3 +1,10 @@
+#ifndef VEC3_HPP
+#define VEC3_HPP
+
+
+#include <iostream>
+
+
 template <typename T>
 class Vec3 {
   public:
@@ -37,3 +44,6 @@ inline Vec3<T> operator+(const Vec3<T> &a,const Vec3<T> &b)
 {
   return {a.x() + b.x(), a.y() + b.y(), a.z() + b.z()};
 }
+
+
+#endif /* VEC3_HPP */

@@ -1,3 +1,4 @@
+#include "../vec3expr.hpp"
 #include "../mat33expr.hpp"
 
 
@@ -12,7 +13,9 @@ void
 {
   evalAndAddDeriv(expr(a,da)*expr(b,db)*expr(c,dc),dresult);
 }
-#else
+#endif
+
+#if 0
 void
   testFunction(
     float a,float &da,
@@ -22,5 +25,15 @@ void
   )
 {
   evalAndAddDeriv(expr(a,da)*expr(b,db)*expr(c,dc),dresult);
+}
+#endif
+
+
+#if 1
+void testFunction(float &dv)
+{
+  auto a = vec3(expr(2),expr(3,dv),expr(4));
+  auto b = vec3(expr(5),expr(6),   expr(7));
+  evalAndAddDeriv(dot(a,b),1);
 }
 #endif

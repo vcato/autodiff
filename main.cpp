@@ -1550,8 +1550,7 @@ static void testMat33Inv()
   {
     FloatMat33 a = mat33Identity();
     FloatMat33 a_inv = mat33Inv(a);
-    FloatMat33 a_times_a_inv = a*a_inv;
-    assertNear(a_times_a_inv,mat33Identity(),1e-4);
+    assertNear(a_inv,mat33Identity(),1e-4);
   }
   {
     RandomEngine random_engine(/*seed*/1);

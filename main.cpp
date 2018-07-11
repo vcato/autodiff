@@ -59,6 +59,17 @@ static float finiteDeriv(Function f,float &v)
 
 
 template <typename Function>
+static FloatVec3 finiteDeriv(Function f,FloatVec3 &v)
+{
+  float x = finiteDeriv(f,v.x());
+  float y = finiteDeriv(f,v.y());
+  float z = finiteDeriv(f,v.z());
+
+  return {x,y,z};
+}
+
+
+template <typename Function>
 static FloatMat33 finiteDeriv(Function f,FloatMat33 &m)
 {
   FloatMat33 result = zeroMat33();
@@ -86,16 +97,6 @@ static float differenceBetween(const FloatVec3 &a,const FloatVec3 &b)
   float dz = differenceBetween(a.z(), b.z());
 
   return max(dx,dy,dz);
-}
-
-
-template <typename Function>
-static FloatVec3 finiteDeriv(Function f,FloatVec3 &v)
-{
-  float dx = finiteDeriv(f,v.x());
-  float dy = finiteDeriv(f,v.y());
-  float dz = finiteDeriv(f,v.z());
-  return FloatVec3{dx,dy,dz};
 }
 
 
@@ -148,6 +149,16 @@ static FloatMat33 randomMat33(RandomEngine &random_engine)
   };
 
   return FloatMat33(values);
+}
+
+
+static float weightedSum(const FloatVec3 &v,const FloatVec3 &w)
+{
+  float x = v.x()*w.x();
+  float y = v.y()*w.y();
+  float z = v.z()*w.z();
+
+  return x + y + z;
 }
 
 
@@ -453,19 +464,46 @@ static void testMat33InvEvaluator()
 
 static void testDotEvaluator()
 {
+  {
+    RandomEngine random_engine(/*seed*/1);
+    FloatVec3 a = randomVec3(random_engine);
+    FloatVec3 b = randomVec3(random_engine);
+    FloatVec3 da{0,0,0};
+    FloatVec3 db{0,0,0};
+
+    auto e = dot(expr(a,da),expr(b,db));
+    float dresult = 1;
+    float result = evalAndAddDeriv(e,dresult);
+    auto f = [&]{ return dot(a,b); };
+    assert(result==f());
+    assertNear(da,finiteDeriv(f,a),1e-4);
+    assertNear(db,finiteDeriv(f,b),1e-4);
+  }
+  {
+    float dv = 0;
+    {
+      auto a = vec3(expr(2),expr(3,dv),expr(4));
+      auto b = vec3(expr(5),expr(6),   expr(7));
+      evalAndAddDeriv(dot(a,b),1);
+    }
+    assertNear(dv,6.0f,1e-4);
+  }
+}
+
+
+static void testVec3AddEvaluator()
+{
   RandomEngine random_engine(/*seed*/1);
   FloatVec3 a = randomVec3(random_engine);
   FloatVec3 b = randomVec3(random_engine);
   FloatVec3 da{0,0,0};
   FloatVec3 db{0,0,0};
-
-  auto e = dot(expr(a,da),expr(b,db));
-  float dresult = 1;
-  float result = evalAndAddDeriv(e,dresult);
-  auto f = [&]{ return dot(a,b); };
-  assert(result==f());
-  assertNear(da,finiteDeriv(f,a),1e-4);
-  assertNear(db,finiteDeriv(f,b),1e-4);
+  FloatVec3 dresult = randomVec3(random_engine);
+  FloatVec3 result = evalAndAddDeriv(expr(a,da) + expr(b,db),dresult);
+  auto f = [&]{ return weightedSum(a+b,dresult); };
+  assertNear(result,a+b,0);
+  assertNear(finiteDeriv(f,a),da,1e-4);
+  assertNear(finiteDeriv(f,b),db,1e-4);
 }
 
 
@@ -479,40 +517,6 @@ static void testRotXEvaluator()
   auto f = [&]{ return weightedSum(rotX(a),dresult); };
   assertNear(da,finiteDeriv(f,a),1e-4);
 }
-
-
-#if 0
-static void testDot2()
-{
-  float dv = 0;
-  {
-    DualFloat v{3,dv};
-    auto a = var(vec3(expr(2),expr(v),expr(4)));
-    auto b = var(vec3(expr(5),expr(6),expr(7)));
-    auto e = var(dot(a,b));
-    addDeriv(e,1);
-  }
-  assertNear(dv,6.0f,1e-4);
-}
-#endif
-
-
-#if 0
-static void testAddingVectors()
-{
-  float dv = 0;
-
-  {
-    DualFloat v{3,dv};
-    auto a = vec3(1,2,v);
-    auto b = vec3(4,5,6);
-    auto e = var(a+b);
-    addDeriv(e,1);
-  }
-
-  assertNear(dv,1.0f,1e-4);
-}
-#endif
 
 
 }
@@ -531,6 +535,9 @@ int main()
   tests::testSinEvaluator();
 
   tests::testDualVec3Evaluator();
+  tests::testDotEvaluator();
+  tests::testVec3AddEvaluator();
+
   tests::testCofactorEvaluator();
   tests::testMat33Evaluator();
   tests::testCofactorMatrixEvaluator();
@@ -539,8 +546,5 @@ int main()
   tests::testMat33MulEvaluator();
   tests::testMat33DivEvaluator();
   tests::testMat33InvEvaluator();
-  tests::testDotEvaluator();
   tests::testRotXEvaluator();
-  //tests::testDot2();
-  // tests::testAddingVectors();
 }

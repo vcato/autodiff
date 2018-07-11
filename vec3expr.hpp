@@ -35,6 +35,33 @@ static Vec3Expr<Vec3Func<A,B,C>>
 }
 
 
+template <typename X,typename Y,typename Z>
+struct Evaluator<Vec3Func<X,Y,Z>> {
+  Evaluator<X> x_eval;
+  Evaluator<Y> y_eval;
+  Evaluator<Z> z_eval;
+
+  Evaluator(const Vec3Func<X,Y,Z> &expr)
+  : x_eval(expr.x),
+    y_eval(expr.y),
+    z_eval(expr.z)
+  {
+  }
+
+  FloatVec3 value() const
+  {
+    return FloatVec3(x_eval.value(),y_eval.value(),z_eval.value());
+  }
+
+  void addDeriv(const FloatVec3 &deriv)
+  {
+    x_eval.addDeriv(deriv.x());
+    y_eval.addDeriv(deriv.y());
+    z_eval.addDeriv(deriv.z());
+  }
+};
+
+
 inline FloatVec3 evaluate(const DualVec3 &dual)
 {
   float x = evaluate(dual.x());
@@ -138,4 +165,39 @@ struct Evaluator<Dot<A,B>> {
 };
 
 
+template <typename A,typename B>
+struct Vec3Add {
+  A a;
+  B b;
+};
 
+
+template <typename A,typename B>
+Vec3Expr<Vec3Add<A,B>> operator+(const Vec3Expr<A> &a,const Vec3Expr<B> &b)
+{
+  return {{a.expr,b.expr}};
+}
+
+
+template <typename A,typename B>
+struct Evaluator<Vec3Add<A,B>> {
+  Evaluator<A> a_eval;
+  Evaluator<B> b_eval;
+
+  Evaluator(const Vec3Add<A,B> &expr)
+  : a_eval(expr.a),
+    b_eval(expr.b)
+  {
+  }
+
+  FloatVec3 value() const
+  {
+    return a_eval.value() + b_eval.value();
+  }
+
+  void addDeriv(const FloatVec3 &deriv)
+  {
+    a_eval.addDeriv(deriv);
+    b_eval.addDeriv(deriv);
+  }
+};

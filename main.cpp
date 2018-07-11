@@ -1373,22 +1373,8 @@ struct Evaluator<Mat33Mul<A,B>> {
 
   void addDeriv(const FloatMat33 &dvalue)
   {
-    FloatMat33 da = zeroMat33();
-    FloatMat33 db = zeroMat33();
-    FloatMat33 av = a.value();
-    FloatMat33 bv = b.value();
-
-    for (int i=0; i!=3; ++i) {
-      for (int j=0; j!=3; ++j) {
-        for (int k=0; k!=3; ++k) {
-          da[i][k] += dvalue[i][j]*bv[k][j];
-          db[k][j] += dvalue[i][j]*av[i][k];
-        }
-      }
-    }
-
-    a.addDeriv(da);
-    b.addDeriv(db);
+    a.addDeriv(dvalue*transpose(b.value()));
+    b.addDeriv(transpose(a.value())*dvalue);
   }
 };
 }

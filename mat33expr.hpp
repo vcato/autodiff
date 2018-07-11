@@ -462,13 +462,11 @@ Mat33Expr<RotX<Angle>> rotX(ScalarExpr<Angle> angle)
 template <typename Angle>
 struct Evaluator<RotX<Angle>> {
   ScalarExprVar<Angle> angle;
-  ScalarExprVar<Cos<Angle>> cosa;
-  ScalarExprVar<Sin<Angle>> sina;
+  ScalarExprVar<Cos<Angle>> cosa{cos(expr(angle)).expr};
+  ScalarExprVar<Sin<Angle>> sina{sin(expr(angle)).expr};
 
   Evaluator(const RotX<Angle> &expr)
-  : angle(expr.angle),
-    cosa(cos(::expr(angle)).expr),
-    sina(sin(::expr(angle)).expr)
+  : angle(expr.angle)
   {
   }
 

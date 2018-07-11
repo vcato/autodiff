@@ -23,9 +23,25 @@ using std::max;
 
 
 
+static float max(float a,float b,float c)
+{
+  return std::max(std::max(a,b),c);
+}
+
+
 static float differenceBetween(float a,float b)
 {
   return fabsf(a-b);
+}
+
+
+static float differenceBetween(const FloatVec3 &a,const FloatVec3 &b)
+{
+  float dx = differenceBetween(a.x(), b.x());
+  float dy = differenceBetween(a.y(), b.y());
+  float dz = differenceBetween(a.z(), b.z());
+
+  return max(dx,dy,dz);
 }
 
 
@@ -81,22 +97,6 @@ static FloatMat33 finiteDeriv(Function f,FloatMat33 &m)
   }
 
   return result;
-}
-
-
-static float max(float a,float b,float c)
-{
-  return std::max(std::max(a,b),c);
-}
-
-
-static float differenceBetween(const FloatVec3 &a,const FloatVec3 &b)
-{
-  float dx = differenceBetween(a.x(), b.x());
-  float dy = differenceBetween(a.y(), b.y());
-  float dz = differenceBetween(a.z(), b.z());
-
-  return max(dx,dy,dz);
 }
 
 

@@ -36,14 +36,51 @@ auto genDot(const A a,const B b)
 }
 
 
-using FloatVec3 = Vec3<float>;
+template <typename T>
+T dot(const Vec3<T> &a,const Vec3<T> &b)
+{
+  return genDot(a,b);
+}
 
 
 template <typename T>
-inline Vec3<T> operator+(const Vec3<T> &a,const Vec3<T> &b)
+Vec3<T> operator+(const Vec3<T> &a,const Vec3<T> &b)
 {
   return {a.x() + b.x(), a.y() + b.y(), a.z() + b.z()};
 }
+
+
+template <typename T>
+Vec3<T> operator-(const Vec3<T> &a,const Vec3<T> &b)
+{
+  return {a.x() - b.x(), a.y() - b.y(), a.z() - b.z()};
+}
+
+
+
+template <typename T>
+Vec3<T> operator/(const Vec3<T> &a,T b)
+{
+  return {a.x()/b, a.y()/b, a.z()/b};
+}
+
+
+template <typename T>
+Vec3<T> operator*(const Vec3<T> &a,T b)
+{
+  return {a.x()*b, a.y()*b, a.z()*b};
+}
+
+
+template <typename T>
+T mag(const Vec3<T> &v)
+{
+  return sqrt(dot(v,v));
+}
+
+
+using FloatVec3 = Vec3<float>;
+
 
 
 #endif /* VEC3_HPP */

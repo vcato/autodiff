@@ -4,16 +4,24 @@
 #include <iostream>
 #include <cassert>
 #include <cmath>
+#include "vec3.hpp"
 
 
-template <typename Self>
+template <typename Matrix> decltype(auto) element(Matrix &matrix,int i,int j)
+{
+  return matrix.element(matrix,i,j);
+}
+
+
+
+template <typename Matrix>
 struct RowRef {
-  Self &self;
+  Matrix &matrix;
   int i;
 
   decltype(auto) operator[](int j)
   {
-    return self.element(self,i,j);
+    return element(matrix,i,j);
   }
 };
 
@@ -22,6 +30,25 @@ template <typename Self>
 auto row(Self &arg,int i)
 {
   return RowRef<Self>{arg,i};
+}
+
+
+template <typename Matrix>
+struct ColRef {
+  Matrix &matrix;
+  int j;
+
+  decltype(auto) operator[](int i)
+  {
+    return element(matrix,i,j);
+  }
+};
+
+
+template <typename Self>
+auto col(Self &arg,int j)
+{
+  return ColRef<Self>{arg,j};
 }
 
 
@@ -255,6 +282,26 @@ inline FloatMat33 rotX(float sina,float cosa)
 inline FloatMat33 rotX(float angle)
 {
   return rotX(sinf(angle),cosf(angle));
+}
+
+
+template <typename T>
+inline Vec3<T> vec3(ColRef<const Mat33<T>> c)
+{
+  return {c[0],c[1],c[2]};
+}
+
+
+template <typename T>
+inline Mat33<T> columns(const Vec3<T> &c1,const Vec3<T> &c2,const Vec3<T> &c3)
+{
+  T values[3][3] = {
+    {c1.x(),c2.x(),c3.x()},
+    {c1.y(),c2.y(),c3.y()},
+    {c1.z(),c2.z(),c3.z()},
+  };
+
+  return {values};
 }
 
 

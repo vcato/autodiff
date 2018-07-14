@@ -176,7 +176,141 @@ static float weightedSum(const FloatMat33 &m,const FloatMat33 &w)
 }
 
 
+namespace {
+struct QRDecomposition {
+  FloatMat33 q;
+  FloatMat33 r;
+};
+}
+
+
+static QRDecomposition qrDecomposed(const FloatMat33 &a)
+{
+  // Make q*r == a
+  // q is an orthogonal matrix
+  // r is an upper triangular matrix
+
+  // a = q*r
+  // [a11,a12,a13]   [q11,q12,q13]   [r11,r12,r13]
+  // [a21,a22,a23] = [q21,q22,q23] * [  0,r22,r23]
+  // [a31,a32,a33]   [q31,a32,a33]   [  0,  0,r33]
+
+  // q1 = <q11,q21,q31>
+  // q2 = <q12,q22,q32>
+  // q3 = <q13,q23,q33>
+
+  // a1 = <a11,a21,a31>
+  // a2 = <a12,a22,a32>
+  // a3 = <a13,a23,a33>
+
+  FloatVec3 a1 = vec3(col(a,0));
+  FloatVec3 a2 = vec3(col(a,1));
+  FloatVec3 a3 = vec3(col(a,2));
+
+  // a1 = q1*r11
+  // a2 = q1*r12 + q2*r22
+  // a3 = q1*r13 + q2*r23 + q3*r33
+
+  // each ui is orthogonal to uj when i!=j
+  //   ui = ai - sum{j if j!=i}(dot(qj,ai)*qj)
+  // qi is the normalized version of ui
+  //   qi = ui/mag(ui)
+
+  // u1 = a1
+  FloatVec3 u1 = a1;
+  // q1 = u1/mag(u1)
+  // q1*mag(u1) = u1
+  // u1 = q1*mag(u1)
+  // a1 = q1*r11
+  // r11 = mag(u1)
+  float r11 = mag(u1);
+
+  // q1 = u1/mag(u1)
+  // q1 = u1/r11
+  FloatVec3 q1 = u1/r11;
+
+  // u2 = a2 - q1*dot(q1,a2)
+  // u2 + q1*dot(q1,a2) = a2
+  // a2 = u2 + q1*dot(q1,a2)
+  // a2 = q1*dot(q1,a2) + u2
+  // q2 = u2/mag(u2)
+  // q2*mag(u2) = u2
+  // u2 = q2*mag(u2)
+  // a2 = u2 + q1*dot(q1,a2)
+  // a2 = q1*dot(q1,a2) + q2*mag(u2)
+  // a2 = q1*r12 + q2*r22
+  // r12 = dot(q1,a2)
+  float r12 = dot(a2,q1);
+  // u2 = a2 - q1*dot(q1,a2)
+  // u2 = a2 - q1*r12
+  FloatVec3 u2 = a2 - q1*r12;
+  // r22 = mag(u2)
+  float r22 = mag(u2);
+  // q2 = u2/mag(u2)
+  // q2 = u2/r22
+  FloatVec3 q2 = u2/r22;
+
+  // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
+  // u3 + q1*dot(q1,a3) + q2*dot(q2,a3) = a3
+  // a3 = u3 + q1*dot(q1,a3) + q2*dot(q2,a3)
+  // a3 = q1*dot(q1,a3) + q2*dot(q2,a3) + u3
+  // a3 = q1*dot(q1,a3) + q2*dot(q2,a3) + q3*mag(u3)
+  // a3 = q1*r13 + q2*r23 + q3*r33
+  // r13 = dot(q1,a3)
+  float r13 = dot(q1,a3);
+  // r23 = dot(q2,a3)
+  float r23 = dot(q2,a3);
+  // r33 = mag(u3)
+  // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
+  // u3 = a3 - q1*r13 - q2*r23
+  FloatVec3 u3 = a3 - q1*r13 - q2*r23;
+  float r33 = mag(u3);
+  // q3 = u3/mag(u3)
+  // q3 = u3/r33
+  FloatVec3 q3 = u3/r33;
+
+  float r_values[3][3] = {
+    {r11,r12,r13},
+    {  0,r22,r23},
+    {  0,  0,r33}
+  };
+
+  FloatMat33 q = columns(q1,q2,q3);
+  FloatMat33 r(r_values);
+
+  return {q,r};
+}
+
+
 namespace tests {
+
+static void testRowAndCol()
+{
+  float values[3][3] = {
+    {1,2,3},
+    {4,5,6},
+    {7,8,9}
+  };
+
+  FloatMat33 a(values);
+
+  assert(row(a,0)[0]==1);
+  assert(row(a,0)[1]==2);
+  assert(row(a,0)[2]==3);
+
+  assert(row(a,2)[0]==7);
+  assert(row(a,2)[1]==8);
+  assert(row(a,2)[2]==9);
+
+  assert(col(a,0)[0]==1);
+  assert(col(a,0)[1]==4);
+  assert(col(a,0)[2]==7);
+
+  assert(col(a,2)[0]==3);
+  assert(col(a,2)[1]==6);
+  assert(col(a,2)[2]==9);
+}
+
 
 static void testMat33Inv()
 {
@@ -192,6 +326,17 @@ static void testMat33Inv()
     FloatMat33 a_times_a_inv = a*a_inv;
     assertNear(a_times_a_inv,mat33Identity(),1e-4);
   }
+}
+
+
+static void testQRDecomposition()
+{
+  RandomEngine random_engine(/*seed*/1);
+  FloatMat33 a = randomMat33(random_engine);
+  QRDecomposition qr = qrDecomposed(a);
+  const FloatMat33 &q = qr.q;
+  const FloatMat33 &r = qr.r;
+  assertNear(q*r,a,0);
 }
 
 
@@ -524,7 +669,9 @@ static void testRotXEvaluator()
 
 int main()
 {
+  tests::testRowAndCol();
   tests::testMat33Inv();
+  tests::testQRDecomposition();
 
   tests::testScalarConstantEvaluator();
   tests::testScalarAddEvaluator();

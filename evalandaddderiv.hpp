@@ -1,7 +1,7 @@
 template <typename ExprWrapper,typename Value>
-Value evalAndAddDeriv(const ExprWrapper &mat33_expr,const Value& dresult)
+Value evalAndAddDeriv(ExprWrapper &&wrapper,const Value& dresult)
 {
-  auto e = mat33_expr.expr;
+  auto e = internal(wrapper);
   Evaluator<decltype(e)> eval(e);
   Value result = eval.value();
   eval.addDeriv(dresult);

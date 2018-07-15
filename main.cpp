@@ -23,16 +23,6 @@ using std::max;
 
 
 
-namespace {
-template <typename M>
-struct Mat33Element {
-  M m;
-  int i;
-  int j;
-};
-}
-
-
 template <typename M>
 struct Evaluator<Mat33Element<M>> {
   Evaluator<M> m_eval;
@@ -57,28 +47,6 @@ struct Evaluator<Mat33Element<M>> {
   }
 };
 
-
-
-namespace {
-template <typename M>
-struct Mat33ColExpr {
-  M m;
-  int j;
-
-  ScalarExpr<Mat33Element<M>> operator[](int i)
-  {
-    return {{m,i,j}};
-  }
-};
-}
-
-
-
-template <typename M>
-static Mat33ColExpr<M> col(const Mat33Expr<M> &m,int j)
-{
-  return {m.expr,j};
-}
 
 
 template <typename M>
@@ -288,10 +256,10 @@ struct QRDecomposed {
 }
 
 
-template <typename A>
-static Mat33Expr<QRDecomposed<A>> qrDecomposed(const Mat33Expr<A> &a)
+template <typename AExpr,typename A=Mat33ExprType<AExpr>>
+static Mat33Expr<QRDecomposed<A>> qrDecomposed(const AExpr &a)
 {
-  return {{a.expr}};
+  return {{internal(a)}};
 }
 
 
@@ -337,10 +305,10 @@ struct Evaluator<QRDecomposed<A>> {
   // a1 = <a11,a21,a31>
   // a2 = <a12,a22,a32>
   // a3 = <a13,a23,a33>
-  ExprVar<decltype(vec3(col(expr(a),0)))> a1 = vec3(col(expr(a),0));
-  ExprVar<decltype(vec3(col(expr(a),1)))> a2 = vec3(col(expr(a),1));
-  ExprVar<decltype(vec3(col(expr(a),2)))> a3 = vec3(col(expr(a),2));
-  ExprVar<decltype(expr(a1))> u1 = expr(a1);
+  ExprVar<decltype(vec3(col(a,0)))> a1 = vec3(col(a,0));
+  ExprVar<decltype(vec3(col(a,1)))> a2 = vec3(col(a,1));
+  ExprVar<decltype(vec3(col(a,2)))> a3 = vec3(col(a,2));
+  decltype(a1) &u1 = a1;
 
   // u1 = a1
   // q1 = u1/mag(u1)
@@ -348,11 +316,11 @@ struct Evaluator<QRDecomposed<A>> {
   // u1 = q1*mag(u1)
   // a1 = q1*r11
   // r11 = mag(u1)
-  ExprVar<decltype(mag(expr(u1)))> r11 = mag(expr(u1));
+  ExprVar<decltype(mag(u1))> r11 = mag(u1);
 
   // q1 = u1/mag(u1)
   // q1 = u1/r11
-  ExprVar<decltype(expr(u1)/expr(r11))> q1 = expr(u1)/expr(r11);
+  ExprVar<decltype(u1/r11)> q1 = u1/r11;
 
   // u2 = a2 - q1*dot(q1,a2)
   // u2 + q1*dot(q1,a2) = a2
@@ -365,19 +333,18 @@ struct Evaluator<QRDecomposed<A>> {
   // a2 = q1*dot(q1,a2) + q2*mag(u2)
   // a2 = q1*r12 + q2*r22
   // r12 = dot(q1,a2)
-  ExprVar<decltype(dot(expr(a2),expr(q1)))> r12 = dot(expr(a2),expr(q1));
+  ExprVar<decltype(dot(a2,q1))> r12 = dot(a2,q1);
 
   // u2 = a2 - q1*dot(q1,a2)
   // u2 = a2 - q1*r12
-  ExprVar<decltype(expr(a2) - expr(q1)*expr(r12))> u2 =
-    expr(a2) - expr(q1)*expr(r12);
+  ExprVar<decltype(a2 - q1*r12)> u2 = a2 - q1*r12;
 
   // r22 = mag(u2)
-  ExprVar<decltype(mag(expr(u2)))> r22 = mag(expr(u2));
+  ExprVar<decltype(mag(u2))> r22 = mag(u2);
 
   // q2 = u2/mag(u2)
   // q2 = u2/r22
-  ExprVar<decltype(expr(u2)/expr(r22))> q2 = expr(u2)/expr(r22);
+  ExprVar<decltype(u2/r22)> q2 = u2/r22;
 
   // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
   // u3 + q1*dot(q1,a3) + q2*dot(q2,a3) = a3
@@ -386,22 +353,22 @@ struct Evaluator<QRDecomposed<A>> {
   // a3 = q1*dot(q1,a3) + q2*dot(q2,a3) + q3*mag(u3)
   // a3 = q1*r13 + q2*r23 + q3*r33
   // r13 = dot(q1,a3)
-  ExprVar<decltype(dot(expr(q1),expr(a3)))> r13 = dot(expr(q1),expr(a3));
+  ExprVar<decltype(dot(q1,a3))> r13 = dot(q1,a3);
 
   // r23 = dot(q2,a3)
-  ExprVar<decltype(dot(expr(q2),expr(a3)))> r23 = dot(expr(q2),expr(a3));
+  ExprVar<decltype(dot(q2,a3))> r23 = dot(q2,a3);
 
   // r33 = mag(u3)
   // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
   // u3 = a3 - q1*r13 - q2*r23
-  ExprVar<decltype(expr(a3) - expr(q1)*expr(r13) - expr(q2)*expr(r23))> u3 = expr(a3) - expr(q1)*expr(r13) - expr(q2)*expr(r23);
+  ExprVar<decltype(a3 - q1*r13 - q2*r23)> u3 = a3 - q1*r13 - q2*r23;
 
   // r33 = mag(u3)
-  ExprVar<decltype(mag(expr(u3)))> r33 = mag(expr(u3));
+  ExprVar<decltype(mag(u3))> r33 = mag(u3);
 
   // q3 = u3/mag(u3)
   // q3 = u3/r33
-  ExprVar<decltype(expr(u3)/expr(r33))> q3 = expr(u3)/expr(r33);
+  ExprVar<decltype(u3/r33)> q3 = u3/r33;
 
   float r_values[3][3] = {
     {r11.value(),r12.value(),r13.value()},
@@ -409,8 +376,7 @@ struct Evaluator<QRDecomposed<A>> {
     {          0,          0,r33.value()}
   };
 
-  ExprVar<decltype(columns(expr(q1),expr(q2),expr(q3)))> q =
-    columns(expr(q1),expr(q2),expr(q3));
+  ExprVar<decltype(columns(q1,q2,q3))> q = columns(q1,q2,q3);
 
   Evaluator(const QRDecomposed<A> &expr)
   : a({expr.a})
@@ -436,122 +402,9 @@ struct Evaluator<QRDecomposed<A>> {
 
 
 
-#if 0
-namespace {
-template <typename A>
-struct QRDecomposedFunc {
-  A &a;
-  using Mat33 = A;
-  using Vec3 = decltype(vec3(col(a,0)));
-
-  // Make q*r == a
-  // q is an orthogonal matrix
-  // r is an upper triangular matrix
-
-  // a = q*r
-  // [a11,a12,a13]   [q11,q12,q13]   [r11,r12,r13]
-  // [a21,a22,a23] = [q21,q22,q23] * [  0,r22,r23]
-  // [a31,a32,a33]   [q31,a32,a33]   [  0,  0,r33]
-
-  // q1 = <q11,q21,q31>
-  // q2 = <q12,q22,q32>
-  // q3 = <q13,q23,q33>
-
-  // a1 = q1*r11
-  // a2 = q1*r12 + q2*r22
-  // a3 = q1*r13 + q2*r23 + q3*r33
-
-  // each ui is orthogonal to uj when i!=j
-  //   ui = ai - sum{j if j!=i}(dot(qj,ai)*qj)
-  // qi is the normalized version of ui
-  //   qi = ui/mag(ui)
-
-  // a1 = <a11,a21,a31>
-  // a2 = <a12,a22,a32>
-  // a3 = <a13,a23,a33>
-  Vec3 a1 = vec3(col(a,0));
-  Vec3 a2 = vec3(col(a,1));
-  Vec3 a3 = vec3(col(a,2));
-
-  Vec3 u1 = a1;
-  using Scalar = decltype(mag(u1));
-
-  // u1 = a1
-  // q1 = u1/mag(u1)
-  // q1*mag(u1) = u1
-  // u1 = q1*mag(u1)
-  // a1 = q1*r11
-  // r11 = mag(u1)
-  Scalar r11 = mag(u1);
-
-  // q1 = u1/mag(u1)
-  // q1 = u1/r11
-  Vec3 q1 = u1/r11;
-
-  // u2 = a2 - q1*dot(q1,a2)
-  // u2 + q1*dot(q1,a2) = a2
-  // a2 = u2 + q1*dot(q1,a2)
-  // a2 = q1*dot(q1,a2) + u2
-  // q2 = u2/mag(u2)
-  // q2*mag(u2) = u2
-  // u2 = q2*mag(u2)
-  // a2 = u2 + q1*dot(q1,a2)
-  // a2 = q1*dot(q1,a2) + q2*mag(u2)
-  // a2 = q1*r12 + q2*r22
-  // r12 = dot(q1,a2)
-  Scalar r12 = dot(a2,q1);
-
-  // u2 = a2 - q1*dot(q1,a2)
-  // u2 = a2 - q1*r12
-  Vec3 u2 = a2 - q1*r12;
-
-  // r22 = mag(u2)
-  Scalar r22 = mag(u2);
-
-  // q2 = u2/mag(u2)
-  // q2 = u2/r22
-  Vec3 q2 = u2/r22;
-
-  // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
-  // u3 + q1*dot(q1,a3) + q2*dot(q2,a3) = a3
-  // a3 = u3 + q1*dot(q1,a3) + q2*dot(q2,a3)
-  // a3 = q1*dot(q1,a3) + q2*dot(q2,a3) + u3
-  // a3 = q1*dot(q1,a3) + q2*dot(q2,a3) + q3*mag(u3)
-  // a3 = q1*r13 + q2*r23 + q3*r33
-  // r13 = dot(q1,a3)
-  Scalar r13 = dot(q1,a3);
-
-  // r23 = dot(q2,a3)
-  Scalar r23 = dot(q2,a3);
-
-  // r33 = mag(u3)
-  // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
-  // u3 = a3 - q1*r13 - q2*r23
-  Vec3 u3 = a3 - q1*r13 - q2*r23;
-
-  // r33 = mag(u3)
-  Scalar r33 = mag(u3);
-
-  // q3 = u3/mag(u3)
-  // q3 = u3/r33
-  Vec3 q3 = u3/r33;
-
-  Scalar r_values[3][3] = {
-    {r11,r12,r13},
-    {  0,r22,r23},
-    {  0,  0,r33}
-  };
-
-  Mat33 q = columns(q1,q2,q3);
-  Mat33 r{r_values};
-};
-}
-#endif
-
-
-template <typename T>
-static QRDecomposition<T> qrDecomposed(const Mat33<T> &a)
+static QRDecomposition<float> qrDecomposed(const Mat33<float> &a)
 {
+  using T = float;
   // Make q*r == a
   // q is an orthogonal matrix
   // r is an upper triangular matrix
@@ -737,7 +590,7 @@ static void testQRDecomposition()
 static void testScalarConstantEvaluator()
 {
   float dresult = 1;
-  float result = evalAndAddDeriv(expr(5),dresult);
+  float result = evalAndAddDeriv(5,dresult);
   assert(result==5);
 }
 
@@ -750,7 +603,7 @@ static void testScalarAddEvaluator()
     float b = 2;
     float db = 0;
     float dresult = 1;
-    float result = evalAndAddDeriv(expr(a,da) + expr(b,db),dresult);
+    float result = evalAndAddDeriv(dual(a,da) + dual(b,db),dresult);
 
     assert(da==1);
     assert(db==1);
@@ -760,7 +613,7 @@ static void testScalarAddEvaluator()
     float a = 1;
     float da = 0;
     float dresult = 1;
-    float result = evalAndAddDeriv(expr(a,da) + expr(2),dresult);
+    float result = evalAndAddDeriv(dual(a,da) + 2,dresult);
 
     assert(da==1);
     assert(result==3);
@@ -775,7 +628,7 @@ static void testScalarSubEvaluator()
   float b = 2;
   float db = 0;
   float dresult = 1;
-  float result = evalAndAddDeriv(expr(a,da) - expr(b,db),dresult);
+  float result = evalAndAddDeriv(dual(a,da) - dual(b,db),dresult);
 
   assert(da== 1);
   assert(db==-1);
@@ -790,7 +643,7 @@ static void testScalarMulEvaluator()
   float b = 2;
   float db = 0;
   float dresult = 1;
-  float result = evalAndAddDeriv(expr(a,da) * expr(b,db),dresult);
+  float result = evalAndAddDeriv(dual(a,da) * dual(b,db),dresult);
 
   assert(da==2);
   assert(db==1);
@@ -805,7 +658,7 @@ static void testScalarDivEvaluator()
   float b = 2;
   float db = 0;
   float dresult = 1;
-  float result = evalAndAddDeriv(expr(a,da) / expr(b,db),dresult);
+  float result = evalAndAddDeriv(dual(a,da) / dual(b,db),dresult);
   auto f = [&]{ return a/b; };
 
   assertNear(da,finiteDeriv(f,a),1e-4);
@@ -820,7 +673,7 @@ static void testScalarMagEvaluator()
   FloatVec3 v = randomVec3(random_engine);
   FloatVec3 dv{0,0,0};
   float dresult = 1;
-  float result = evalAndAddDeriv(mag(expr(v,dv)),dresult);
+  float result = evalAndAddDeriv(mag(dual(v,dv)),dresult);
   auto f = [&]{ return mag(v); };
   assert(result==f());
   assertNear(dv,finiteDeriv(f,v),1e-4);
@@ -833,7 +686,7 @@ static void testSqrtEvaluator()
   float x = randomFloat(0,1,random_engine);
   float dx = 0;
   float dresult = 1;
-  float result = evalAndAddDeriv(sqrt(expr(x,dx)),dresult);
+  float result = evalAndAddDeriv(sqrt(dual(x,dx)),dresult);
   assert(result==sqrtf(x));
   auto f = [&]{ return sqrtf(x); };
   assertNear(dx,finiteDeriv(f,x),1e-5);
@@ -846,7 +699,7 @@ static void testCosEvaluator()
   float a = randomFloat(-M_PI,M_PI,random_engine);
   float da = 0;
   float dresult = randomFloat(-1,1,random_engine);
-  float result = evalAndAddDeriv(cos(expr(a,da)),dresult);
+  float result = evalAndAddDeriv(cos(dual(a,da)),dresult);
   assert(result==cosf(a));
   auto f = [&]{ return cosf(a); };
   assertNear(da,finiteDeriv(f,a),.005);
@@ -859,7 +712,7 @@ static void testSinEvaluator()
   float a = randomFloat(-M_PI,M_PI,random_engine);
   float da = 0;
   float dresult = randomFloat(-1,1,random_engine);
-  float result = evalAndAddDeriv(sin(expr(a,da)),dresult);
+  float result = evalAndAddDeriv(sin(dual(a,da)),dresult);
   assert(result==sinf(a));
   auto f = [&]{ return sinf(a); };
   assertNear(da,finiteDeriv(f,a),.005);
@@ -871,7 +724,7 @@ static void testDualVec3Evaluator()
   FloatVec3 a{1,2,3};
   FloatVec3 da{0,0,0};
   FloatVec3 dresult{1,0,0};
-  evalAndAddDeriv(expr(a,da),dresult);
+  evalAndAddDeriv(dual(a,da),dresult);
   auto f = [&]{ return a.x(); };
   assertNear(da,finiteDeriv(f,a),1e-4);
 }
@@ -886,7 +739,7 @@ static void testCofactorEvaluator()
     for (int j=0; j!=3; ++j) {
       FloatMat33 dmat = zeroMat33();
       float dresult = 1;
-      float result = evalAndAddDeriv(cofactor(expr(mat,dmat),i,j),dresult);
+      float result = evalAndAddDeriv(cofactor(dual(mat,dmat),i,j),dresult);
 
       auto f = [&]{ return cofactor(mat,i,j); };
       assert(result==f());
@@ -901,21 +754,21 @@ static void testMat33Evaluator()
   RandomEngine random_engine(/*seed*/1);
   FloatMat33 mat = randomMat33(random_engine);
   FloatMat33 dmat = zeroMat33();
-  auto m = expr(mat,dmat);
+  auto m = dual(mat,dmat);
   using Element = ScalarAdd<DualFloat,float>;
   Element values[3][3] = {
-    {(m[0][0] + expr(1)).expr,
-     (m[0][1] + expr(1)).expr,
-     (m[0][2] + expr(1)).expr},
-    {(m[1][0] + expr(1)).expr,
-     (m[1][1] + expr(1)).expr,
-     (m[1][2] + expr(1)).expr},
-    {(m[2][0] + expr(1)).expr,
-     (m[2][1] + expr(1)).expr,
-     (m[2][2] + expr(1)).expr},
+    {(m[0][0] + 1).expr,
+     (m[0][1] + 1).expr,
+     (m[0][2] + 1).expr},
+    {(m[1][0] + 1).expr,
+     (m[1][1] + 1).expr,
+     (m[1][2] + 1).expr},
+    {(m[2][0] + 1).expr,
+     (m[2][1] + 1).expr,
+     (m[2][2] + 1).expr},
   };
 
-  auto e = expr(Mat33<Element>(values));
+  auto e = Mat33<Element>(values);
   FloatMat33 dresult = randomMat33(random_engine);
 
   evalAndAddDeriv(e,dresult);
@@ -930,7 +783,7 @@ static void testColEvaluator()
   FloatMat33 mat = randomMat33(random_engine);
   FloatMat33 dmat = zeroMat33();
   float dresult = 1;
-  float result = evalAndAddDeriv(col(expr(mat,dmat),0)[0],dresult);
+  float result = evalAndAddDeriv(col(dual(mat,dmat),0)[0],dresult);
   assert(result==mat[0][0]);
   auto f = [&]{ return mat[0][0]; };
   assertNear(dmat,finiteDeriv(f,mat),1e-5);
@@ -944,7 +797,7 @@ static void testVec3Evaluator()
   FloatMat33 mat = randomMat33(random_engine);
   FloatMat33 dmat = zeroMat33();
   FloatVec3 dresult = randomVec3(random_engine);
-  FloatVec3 result = evalAndAddDeriv(vec3(col(expr(mat,dmat),0)),dresult);
+  FloatVec3 result = evalAndAddDeriv(vec3(col(dual(mat,dmat),0)),dresult);
   ColRef<FloatMat33> c{mat,0};
   assert(result==vec3(c));
   auto f = [&]{ return weightedSum(vec3(col(mat,0)),dresult); };
@@ -958,7 +811,7 @@ static void testCofactorMatrixEvaluator()
   FloatMat33 mat = randomMat33(random_engine);
   FloatMat33 dmat = zeroMat33();
   FloatMat33 dresult = randomMat33(random_engine);
-  evalAndAddDeriv(cofactorMatrix(expr(mat,dmat)),dresult);
+  evalAndAddDeriv(cofactorMatrix(dual(mat,dmat)),dresult);
   auto f = [&]{ return weightedSum(cofactorMatrix(mat),dresult); };
   assertNear(dmat,finiteDeriv(f,mat),2e-4);
 }
@@ -970,7 +823,7 @@ static void testDeterminantEvaluator()
   FloatMat33 mat = randomMat33(random_engine);
   FloatMat33 dmat = zeroMat33();
   float dresult = 1;
-  float result = evalAndAddDeriv(determinant(expr(mat,dmat)),dresult);
+  float result = evalAndAddDeriv(determinant(dual(mat,dmat)),dresult);
   auto f = [&]{ return determinant(mat); };
   assert(result==f());
   assertNear(dmat,finiteDeriv(f,mat),1e-4);
@@ -983,7 +836,7 @@ static void testTransposeEvaluator()
   FloatMat33 mat = randomMat33(random_engine);
   FloatMat33 dmat = zeroMat33();
   FloatMat33 dresult = randomMat33(random_engine);
-  FloatMat33 result = evalAndAddDeriv(transpose(expr(mat,dmat)),dresult);
+  FloatMat33 result = evalAndAddDeriv(transpose(dual(mat,dmat)),dresult);
   assertNear(result,transpose(mat),0);
   auto f = [&]{ return weightedSum(transpose(mat),dresult); };
   assertNear(dmat,finiteDeriv(f,mat),2e-4);
@@ -999,7 +852,7 @@ static void testMat33MulEvaluator()
     FloatMat33 da = zeroMat33();
     FloatMat33 db = zeroMat33();
     FloatMat33 dresult = randomMat33(random_engine);
-    evalAndAddDeriv(expr(a,da)*expr(b,db),dresult);
+    evalAndAddDeriv(dual(a,da)*dual(b,db),dresult);
     auto f = [&]{ return weightedSum(a*b,dresult); };
     assertNear(da,finiteDeriv(f,a),1e-4);
     assertNear(db,finiteDeriv(f,b),1e-4);
@@ -1013,7 +866,7 @@ static void testMat33MulEvaluator()
     FloatMat33 db = zeroMat33();
     FloatMat33 dc = zeroMat33();
     FloatMat33 dresult = randomMat33(random_engine);
-    evalAndAddDeriv(expr(a,da)*expr(b,db)*expr(c,dc),dresult);
+    evalAndAddDeriv(dual(a,da)*dual(b,db)*dual(c,dc),dresult);
     auto f = [&]{ return weightedSum(a*b*c,dresult); };
     assertNear(da,finiteDeriv(f,a),1e-4);
     assertNear(db,finiteDeriv(f,b),1e-4);
@@ -1031,7 +884,7 @@ static void testMat33DivEvaluator()
 
   FloatMat33 dmat = zeroMat33();
   FloatMat33 dresult = randomMat33(random_engine);
-  auto e = expr(mat,dmat)/expr(divisor,ddivisor);
+  auto e = dual(mat,dmat)/dual(divisor,ddivisor);
   FloatMat33 result = evalAndAddDeriv(e,dresult);
   auto f = [&]{ return weightedSum(mat/divisor,dresult); };
   assertNear(result,mat/divisor,0);
@@ -1048,7 +901,7 @@ static void testMat33InvEvaluator()
   FloatMat33 dmat = zeroMat33();
   FloatMat33 dresult = randomMat33(random_engine);
   FloatMat33 result =
-    evalAndAddDeriv(mat33Inv(expr(mat,dmat)),dresult);
+    evalAndAddDeriv(mat33Inv(dual(mat,dmat)),dresult);
   auto f = [&]{ return weightedSum(mat33Inv(mat),dresult); };
   assertNear(result,mat33Inv(mat),0);
   assertNear(dmat,finiteDeriv(f,mat),1e-3);
@@ -1064,7 +917,7 @@ static void testDotEvaluator()
     FloatVec3 da{0,0,0};
     FloatVec3 db{0,0,0};
 
-    auto e = dot(expr(a,da),expr(b,db));
+    auto e = dot(dual(a,da),dual(b,db));
     float dresult = 1;
     float result = evalAndAddDeriv(e,dresult);
     auto f = [&]{ return dot(a,b); };
@@ -1075,8 +928,8 @@ static void testDotEvaluator()
   {
     float dv = 0;
     {
-      auto a = vec3(expr(2),expr(3,dv),expr(4));
-      auto b = vec3(expr(5),expr(6),   expr(7));
+      auto a = vec3(2,dual(3,dv),4);
+      auto b = vec3(5,6,7);
       evalAndAddDeriv(dot(a,b),1);
     }
     assertNear(dv,6.0f,1e-4);
@@ -1092,7 +945,7 @@ static void testVec3AddEvaluator()
   FloatVec3 da{0,0,0};
   FloatVec3 db{0,0,0};
   FloatVec3 dresult = randomVec3(random_engine);
-  FloatVec3 result = evalAndAddDeriv(expr(a,da) + expr(b,db),dresult);
+  FloatVec3 result = evalAndAddDeriv(dual(a,da) + dual(b,db),dresult);
   auto f = [&]{ return weightedSum(a+b,dresult); };
   assertNear(result,a+b,0);
   assertNear(finiteDeriv(f,a),da,1e-4);
@@ -1108,7 +961,7 @@ static void testVec3SubEvaluator()
   FloatVec3 da{0,0,0};
   FloatVec3 db{0,0,0};
   FloatVec3 dresult = randomVec3(random_engine);
-  FloatVec3 result = evalAndAddDeriv(expr(a,da) - expr(b,db),dresult);
+  FloatVec3 result = evalAndAddDeriv(dual(a,da) - dual(b,db),dresult);
   auto f = [&]{ return weightedSum(a-b,dresult); };
   assertNear(result,a-b,0);
   assertNear(finiteDeriv(f,a),da,1e-4);
@@ -1124,7 +977,7 @@ static void testVec3ScalarMulEvaluator()
   FloatVec3 da{0,0,0};
   float db = 0;
   FloatVec3 dresult = randomVec3(random_engine);
-  FloatVec3 result = evalAndAddDeriv(expr(a,da) * expr(b,db),dresult);
+  FloatVec3 result = evalAndAddDeriv(dual(a,da) * dual(b,db),dresult);
   auto f = [&]{ return weightedSum(a*b,dresult); };
   assertNear(result,a*b,0);
   assertNear(finiteDeriv(f,a),da,1e-4);
@@ -1140,7 +993,7 @@ static void testScalarVec3MulEvaluator()
   FloatVec3 da{0,0,0};
   float db = 0;
   FloatVec3 dresult = randomVec3(random_engine);
-  FloatVec3 result = evalAndAddDeriv(expr(b,db) * expr(a,da),dresult);
+  FloatVec3 result = evalAndAddDeriv(dual(b,db) * dual(a,da),dresult);
   auto f = [&]{ return weightedSum(b*a,dresult); };
   assertNear(result,b*a,0);
   assertNear(finiteDeriv(f,a),da,1e-4);
@@ -1156,7 +1009,7 @@ static void testVec3DivEvaluator()
   FloatVec3 da{0,0,0};
   float db = 0;
   FloatVec3 dresult = randomVec3(random_engine);
-  FloatVec3 result = evalAndAddDeriv(expr(a,da) / expr(b,db),dresult);
+  FloatVec3 result = evalAndAddDeriv(dual(a,da) / dual(b,db),dresult);
   auto f = [&]{ return weightedSum(a/b,dresult); };
   assertNear(result,a/b,0);
   assertNear(finiteDeriv(f,a),da,1e-4);
@@ -1170,7 +1023,7 @@ static void testRotXEvaluator()
   float a = randomFloat(-1,1,random_engine);
   float da = 0;
   FloatMat33 dresult = randomMat33(random_engine);
-  evalAndAddDeriv(rotX(expr(a,da)),dresult);
+  evalAndAddDeriv(rotX(dual(a,da)),dresult);
   auto f = [&]{ return weightedSum(rotX(a),dresult); };
   assertNear(da,finiteDeriv(f,a),1e-4);
 }
@@ -1187,7 +1040,7 @@ static void testColumnsEvaluator()
   FloatVec3 dc3{0,0,0};
   FloatMat33 dresult = randomMat33(random_engine);
   FloatMat33 result =
-    evalAndAddDeriv(columns(expr(c1,dc1),expr(c2,dc2),expr(c3,dc3)),dresult);
+    evalAndAddDeriv(columns(dual(c1,dc1),dual(c2,dc2),dual(c3,dc3)),dresult);
   assert(result==columns(c1,c2,c3));
   auto f = [&]{ return weightedSum(columns(c1,c2,c3),dresult); };
   assertNear(dc1,finiteDeriv(f,c1),2e-4);
@@ -1203,7 +1056,7 @@ static void testExprVar1()
   FloatMat33 da = zeroMat33();
   Mat33ExprVar<DualMat33> a_var(dual(a,da));
   FloatMat33 dresult = randomMat33(random_engine);
-  FloatMat33 result = evalAndAddDeriv(expr(a_var),dresult);
+  FloatMat33 result = evalAndAddDeriv(a_var,dresult);
   assertNear(result,a,0);
   auto f = [&]{ return weightedSum(a,dresult); };
   assertNear(da,finiteDeriv(f,a),1e-4);
@@ -1218,7 +1071,7 @@ static void testExprVar2()
   FloatVec3 dresult = randomVec3(random_engine);
   {
     Vec3ExprVar<DualVec3> a_var(dual(a,da));
-    Evaluator<DualVec3> eval(expr(a_var).expr);
+    Evaluator<DualVec3> eval(a_var.dual());
     eval.addDeriv(dresult);
   }
   auto f = [&]{ return weightedSum(a,dresult); };
@@ -1235,8 +1088,8 @@ static void testExprVar3()
 
   {
     Mat33ExprVar<DualMat33> a_var(dual(a,da));
-    ExprVar<decltype(vec3(col(expr(a_var),0)))> a1(vec3(col(expr(a_var),0)));
-    FloatVec3 result = evalAndAddDeriv(expr(a1),dresult);
+    ExprVar<decltype(vec3(col(a_var,0)))> a1(vec3(col(a_var,0)));
+    FloatVec3 result = evalAndAddDeriv(a1,dresult);
     assertNear(result,vec3(col(a,0)),0);
   }
   auto f = [&]{ return weightedSum(vec3(col(a,0)),dresult); };
@@ -1255,7 +1108,7 @@ static void testQRDecompositionEvaluator()
   FloatMat33 dr = randomMat33(random_engine);
   QRDecomposition<float> dresult{dq,dr};
   QRDecomposition<float> result =
-    evalAndAddDeriv(qrDecomposed(expr(a,da)),dresult);
+    evalAndAddDeriv(qrDecomposed(dual(a,da)),dresult);
 
   auto f = [&]{
     auto qr = qrDecomposed(a);

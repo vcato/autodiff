@@ -9,11 +9,41 @@ struct Mat33Expr {
 };
 
 
+template <typename T> struct Mat33ExprTypeHelper;
+
+template <typename T>
+using Mat33ExprType = typename Mat33ExprTypeHelper<T>::type;
+
+template <typename T>
+struct Mat33ExprTypeHelper<Mat33Expr<T>> {
+  using type = T;
+};
+
+
+template <>
+struct Mat33ExprTypeHelper<DualMat33> {
+  using type = DualMat33;
+};
+
+
 template <typename T>
 struct DVar {
   T value;
   T deriv;
 };
+
+
+template <typename T> auto internal(Mat33Expr<T> e)
+{
+  return e.expr;
+}
+
+
+template <typename T>
+inline Mat33<T> internal(const Mat33<T> &e)
+{
+  return e;
+}
 
 
 template <typename Expr>
@@ -40,6 +70,25 @@ struct ExprVar<Mat33Expr<Expr>> {
     eval.addDeriv(expr.deriv);
   }
 };
+
+
+template <typename Expr>
+struct Mat33ExprTypeHelper<ExprVar<Mat33Expr<Expr>>> {
+  using type = DualMat33;
+};
+
+
+template <typename Expr>
+struct Mat33ExprTypeHelper<ExprVar<Mat33Expr<Expr>>&> {
+  using type = DualMat33;
+};
+
+
+template <typename Expr>
+DualMat33 internal(ExprVar<Mat33Expr<Expr>> &v)
+{
+  return dual(v.expr.value,v.expr.deriv);
+}
 
 
 template <>
@@ -115,10 +164,15 @@ struct Mat33Mul {
 };
 
 
-template <typename A,typename B>
-Mat33Expr<Mat33Mul<A,B>> operator*(Mat33Expr<A> a,Mat33Expr<B> b)
+template <
+  typename AExpr,
+  typename BExpr,
+  typename A=Mat33ExprType<AExpr>,
+  typename B=Mat33ExprType<BExpr>
+>
+Mat33Expr<Mat33Mul<A,B>> operator*(const AExpr &a,const BExpr &b)
 {
-  return {{a.expr,b.expr}};
+  return {{internal(a),internal(b)}};
 }
 
 
@@ -188,6 +242,25 @@ struct Mat33ExprVar {
 };
 
 
+template <typename M>
+struct Mat33ExprTypeHelper<Mat33ExprVar<M>> {
+  using type = DualMat33;
+};
+
+
+template <typename M>
+struct Mat33ExprTypeHelper<Mat33ExprVar<M>&> {
+  using type = DualMat33;
+};
+
+
+template <typename M>
+DualMat33 internal(Mat33ExprVar<M> &expr)
+{
+  return expr.dual();
+}
+
+
 namespace {
 template <typename T>
 static Mat33<float> evaluate(const Mat33<T> &m)
@@ -232,10 +305,15 @@ struct Mat33Div {
 }
 
 
-template <typename A,typename B>
-inline Mat33Expr<Mat33Div<A,B>> operator/(Mat33Expr<A> a,ScalarExpr<B> b)
+template <
+  typename AExpr,
+  typename BExpr,
+  typename A=Mat33ExprType<AExpr>,
+  typename B=ScalarExprType<BExpr>
+>
+inline Mat33Expr<Mat33Div<A,B>> operator/(const AExpr &a,const BExpr &b)
 {
-  return {{a.expr,b.expr}};
+  return {{internal(a),internal(b)}};
 }
 
 
@@ -272,10 +350,10 @@ struct Cofactor {
 };
 
 
-template <typename M>
-ScalarExpr<Cofactor<M>> cofactor(const Mat33Expr<M> &arg,int i,int j)
+template <typename MExpr,typename M=Mat33ExprType<MExpr>>
+ScalarExpr<Cofactor<M>> cofactor(const MExpr &arg,int i,int j)
 {
-  return {{arg.expr,i,j}};
+  return {{internal(arg),i,j}};
 }
 
 
@@ -302,10 +380,10 @@ struct CofactorMatrixFunc {
 };
 
 
-template <typename M>
-Mat33Expr<CofactorMatrixFunc<M>> cofactorMatrix(const Mat33Expr<M> &m)
+template <typename MExpr,typename M=Mat33ExprType<MExpr>>
+Mat33Expr<CofactorMatrixFunc<M>> cofactorMatrix(const MExpr &m)
 {
-  return {{m.expr}};
+  return {{internal(m)}};
 }
 
 
@@ -399,11 +477,10 @@ struct Determinant {
 };
 
 
-template <typename M>
-ScalarExpr<Determinant<M>> determinant(const Mat33Expr<M> &m)
+template <typename MExpr,typename M=Mat33ExprType<MExpr>>
+ScalarExpr<Determinant<M>> determinant(const MExpr &m)
 {
-  const M &expr = m.expr;
-  return {{expr}};
+  return {{internal(m)}};
 }
 
 
@@ -439,7 +516,7 @@ struct Inv {
 template <typename T>
 Mat33Expr<Inv<T>> mat33Inv(const Mat33Expr<T> &arg)
 {
-  return {{arg.expr}};
+  return {{internal(arg)}};
 }
 
 
@@ -474,10 +551,10 @@ struct RotX {
 };
 
 
-template <typename Angle>
-Mat33Expr<RotX<Angle>> rotX(ScalarExpr<Angle> angle)
+template <typename AngleExpr,typename Angle=ScalarExprType<AngleExpr>>
+Mat33Expr<RotX<Angle>> rotX(const AngleExpr& angle)
 {
-  return {{angle.expr}};
+  return {{internal(angle)}};
 }
 
 
@@ -546,9 +623,44 @@ struct Evaluator<ColumnsFunc<C1,C2,C3>> {
 };
 
 
-template <typename C1,typename C2,typename C3>
+template <
+  typename C1Expr,
+  typename C2Expr,
+  typename C3Expr,
+  typename C1=Vec3ExprType<C1Expr>,
+  typename C2=Vec3ExprType<C2Expr>,
+  typename C3=Vec3ExprType<C3Expr>
+>
 Mat33Expr<ColumnsFunc<C1,C2,C3>>
-  columns(const Vec3Expr<C1> &c1,const Vec3Expr<C2> &c2,const Vec3Expr<C3> &c3)
+  columns(C1Expr &&c1,C2Expr &&c2,C3Expr &&c3)
 {
-  return {{c1.expr,c2.expr,c3.expr}};
+  return {{internal(c1),internal(c2),internal(c3)}};
+}
+
+
+template <typename M>
+struct Mat33Element {
+  M m;
+  int i;
+  int j;
+};
+
+
+template <typename M>
+struct Mat33ColExpr {
+  M m;
+  int j;
+
+  ScalarExpr<Mat33Element<M>> operator[](int i)
+  {
+    return {{m,i,j}};
+  }
+};
+
+
+
+template <typename MExpr,typename M=Mat33ExprType<MExpr>>
+Mat33ColExpr<M> col(MExpr &&m,int j)
+{
+  return {internal(m),j};
 }

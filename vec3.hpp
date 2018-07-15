@@ -42,21 +42,19 @@ auto genDot(const A a,const B b)
 
 
 template <typename T>
-T dot(const Vec3<T> &a,const Vec3<T> &b)
+auto dot(const Vec3<T> &a,const Vec3<T> &b)
 {
   return genDot(a,b);
 }
 
 
-template <typename T>
-Vec3<T> operator+(const Vec3<T> &a,const Vec3<T> &b)
+inline Vec3<float> operator+(const Vec3<float> &a,const Vec3<float> &b)
 {
   return {a.x() + b.x(), a.y() + b.y(), a.z() + b.z()};
 }
 
 
-template <typename T>
-Vec3<T> operator-(const Vec3<T> &a,const Vec3<T> &b)
+Vec3<float> operator-(const Vec3<float> &a,const Vec3<float> &b)
 {
   return {a.x() - b.x(), a.y() - b.y(), a.z() - b.z()};
 }
@@ -69,22 +67,19 @@ Vec3<T> operator-(const Vec3<T> &v)
 }
 
 
-template <typename T>
-Vec3<T> operator/(const Vec3<T> &a,T b)
+inline Vec3<float> operator/(const Vec3<float> &a,float b)
 {
   return {a.x()/b, a.y()/b, a.z()/b};
 }
 
 
-template <typename T>
-Vec3<T> operator*(const Vec3<T> &a,T b)
+inline Vec3<float> operator*(const Vec3<float> &a,float b)
 {
   return {a.x()*b, a.y()*b, a.z()*b};
 }
 
 
-template <typename T>
-Vec3<T> operator*(T b,const Vec3<T> &a)
+inline Vec3<float> operator*(float b,const Vec3<float> &a)
 {
   return {a.x()*b, a.y()*b, a.z()*b};
 }

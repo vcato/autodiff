@@ -6,6 +6,9 @@
 #include "exprvar.hpp"
 
 
+template <typename T> struct ScalarExprTypeHelper;
+
+
 
 template <typename Expr>
 struct ScalarExpr {
@@ -26,7 +29,7 @@ struct ExprVar<ScalarExpr<Expr>> {
   float deriv_member;
 
   ExprVar(const ScalarExpr<Expr> &expr)
-  : eval(expr.expr),
+  : eval(internal(expr)),
     value_member(eval.value()),
     deriv_member(0)
   {
@@ -44,6 +47,19 @@ struct ExprVar<ScalarExpr<Expr>> {
     eval.addDeriv(deriv_member);
   }
 };
+
+
+template <typename T>
+struct ScalarExprTypeHelper<ExprVar<ScalarExpr<T>>&> {
+  using type = DualFloat;
+};
+
+
+template <typename T>
+DualFloat internal(ExprVar<ScalarExpr<T>> &v)
+{
+  return dual(v.value_member,v.deriv_member);
+}
 
 
 template <typename E>
@@ -133,11 +149,79 @@ struct ScalarAdd {
 };
 
 
-template <typename A,typename B>
-ScalarExpr<ScalarAdd<A,B>>
-  operator+(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
+template <typename T> auto internal(ScalarExpr<T> e)
 {
-  return {{a.expr,b.expr}};
+  return e.expr;
+}
+
+
+inline float internal(float e)
+{
+  return e;
+}
+
+
+inline DualFloat internal(const DualFloat &e)
+{
+  return e;
+}
+
+
+template <typename T>
+struct ScalarExprTypeHelper<ScalarExpr<T>> {
+  using type = T;
+};
+
+
+template <typename T>
+struct ScalarExprTypeHelper<ScalarExpr<T>&> {
+  using type = T;
+};
+
+
+template <typename T>
+struct ScalarExprTypeHelper<const ScalarExpr<T> &> {
+  using type = T;
+};
+
+
+template <>
+struct ScalarExprTypeHelper<float> {
+  using type = float;
+};
+
+
+template <>
+struct ScalarExprTypeHelper<DualFloat> {
+  using type = DualFloat;
+};
+
+
+template <>
+struct ScalarExprTypeHelper<DualFloat&> {
+  using type = DualFloat;
+};
+
+
+template <>
+struct ScalarExprTypeHelper<int> {
+  using type = float;
+};
+
+
+template <typename T>
+using ScalarExprType = typename ScalarExprTypeHelper<T>::type;
+
+template <
+  typename AExpr,
+  typename BExpr,
+  typename A = ScalarExprType<AExpr>,
+  typename B = ScalarExprType<BExpr>
+>
+ScalarExpr<ScalarAdd<A,B>>
+  operator+(AExpr &&a,BExpr &&b)
+{
+  return {{internal(a),internal(b)}};
 }
 
 
@@ -148,11 +232,16 @@ struct ScalarSub {
 };
 
 
-template <typename A,typename B>
+template <
+  typename AExpr,
+  typename BExpr,
+  typename A=ScalarExprType<AExpr>,
+  typename B=ScalarExprType<BExpr>
+>
 ScalarExpr<ScalarSub<A,B>>
-  operator-(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
+  operator-(AExpr &&a,BExpr &&b)
 {
-  return {{a.expr,b.expr}};
+  return {{internal(a),internal(b)}};
 }
 
 
@@ -163,11 +252,16 @@ struct ScalarMul {
 };
 
 
-template <typename A,typename B>
+template <
+  typename AExpr,
+  typename BExpr,
+  typename A=ScalarExprType<AExpr>,
+  typename B=ScalarExprType<BExpr>
+>
 ScalarExpr<ScalarMul<A,B>>
-  operator*(const ScalarExpr<A> &a,const ScalarExpr<B> &b)
+  operator*(AExpr &&a,BExpr &&b)
 {
-  return {{a.expr,b.expr}};
+  return {{internal(a),internal(b)}};
 }
 
 
@@ -178,10 +272,15 @@ struct ScalarDiv {
 };
 
 
-template <typename A,typename B>
-ScalarExpr<ScalarDiv<A,B>> operator/(ScalarExpr<A> a,ScalarExpr<B> b)
+template <
+  typename AExpr,
+  typename BExpr,
+  typename A=ScalarExprType<AExpr>,
+  typename B=ScalarExprType<BExpr>
+>
+ScalarExpr<ScalarDiv<A,B>> operator/(AExpr &&a,BExpr &&b)
 {
-  return {{a.expr,b.expr}};
+  return {{internal(a),internal(b)}};
 }
 
 
@@ -191,10 +290,10 @@ struct Cos {
 };
 
 
-template <typename A>
-inline ScalarExpr<Cos<A>> cos(ScalarExpr<A> a)
+template <typename AExpr,typename A=ScalarExprType<AExpr>>
+inline ScalarExpr<Cos<A>> cos(AExpr &&a)
 {
-  return {{a.expr}};
+  return {{internal(a)}};
 }
 
 
@@ -222,10 +321,10 @@ struct Sin {
 };
 
 
-template <typename A>
-ScalarExpr<Sin<A>> sin(ScalarExpr<A> a)
+template <typename AExpr,typename A=ScalarExprType<AExpr>>
+ScalarExpr<Sin<A>> sin(AExpr &&a)
 {
-  return {{a.expr}};
+  return {{internal(a)}};
 }
 
 
@@ -387,10 +486,10 @@ struct Evaluator<Sqrt<X>> {
 };
 
 
-template <typename X>
-ScalarExpr<Sqrt<X>> sqrt(const ScalarExpr<X> &x)
+template <typename XExpr,typename X=ScalarExprType<XExpr>>
+ScalarExpr<Sqrt<X>> sqrt(XExpr &&x)
 {
-  return {{x.expr}};
+  return {{internal(x)}};
 }
 
 

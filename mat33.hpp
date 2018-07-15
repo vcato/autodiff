@@ -45,13 +45,6 @@ struct ColRef {
 };
 
 
-template <typename Self>
-auto col(Self &arg,int j)
-{
-  return ColRef<Self>{arg,j};
-}
-
-
 template <typename T>
 struct Mat33 {
   Mat33(const T (&arg)[3][3])
@@ -120,8 +113,22 @@ struct Mat33 {
 
 
 template <typename T>
-Mat33<T> operator*(const Mat33<T> &a,const Mat33<T> &b)
+auto col(Mat33<T> &arg,int j)
 {
+  return ColRef<Mat33<T>>{arg,j};
+}
+
+
+template <typename T>
+auto col(const Mat33<T> &arg,int j)
+{
+  return ColRef<const Mat33<T>>{arg,j};
+}
+
+
+inline Mat33<float> operator*(const Mat33<float> &a,const Mat33<float> &b)
+{
+  using T = float;
   T values[3][3];
 
   for (int i=0; i!=3; ++i) {

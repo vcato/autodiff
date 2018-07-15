@@ -9,6 +9,12 @@ struct Mat33Expr {
 };
 
 
+template <typename M>
+struct Evaluator<Mat33Expr<M>> : Evaluator<M> {
+  Evaluator(const Mat33Expr<M> &m) : Evaluator<M>(m.expr) {}
+};
+
+
 template <typename T> struct Mat33ExprTypeHelper;
 
 template <typename T>
@@ -311,8 +317,7 @@ struct Evaluator<Mat33Div<A,B>> {
   Mat33ExprVar<A> a;
   ScalarExprVar<B> b;
 
-  Evaluator<decltype(genMat33Div(a,b).expr)>
-    result{ genMat33Div(a,b).expr };
+  Evaluator<decltype(genMat33Div(a,b))> result = genMat33Div(a,b);
 
   Evaluator(const Mat33Div<A,B> &expr)
   : a(expr.a),

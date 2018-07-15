@@ -189,7 +189,7 @@ inline FloatMat33 zeroMat33()
 
 
 template <typename A,typename B>
-auto genMat33Div(const A& a,const B& b)
+auto genMat33Div(A&& a,B&& b)
 {
   decltype(a[0][0]/b) values[3][3] = {
     { a[0][0]/b, a[0][1]/b, a[0][2]/b },

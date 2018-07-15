@@ -3,7 +3,6 @@
 
 
 #include "evaluator.hpp"
-#include "exprvar.hpp"
 
 
 template <typename T> struct ScalarExprTypeHelper;
@@ -19,53 +18,6 @@ struct ScalarExpr {
 inline ScalarExpr<DualFloat> expr(float value,float &deriv)
 {
   return {{value,deriv}};
-}
-
-
-template <typename Expr>
-struct ExprVar<ScalarExpr<Expr>> {
-  Evaluator<Expr> eval;
-  float value_member;
-  float deriv_member;
-
-  ExprVar(const ScalarExpr<Expr> &expr)
-  : eval(internal(expr)),
-    value_member(eval.value()),
-    deriv_member(0)
-  {
-  }
-
-  float value() const { return value_member; }
-
-  void addDeriv(float dvalue)
-  {
-    deriv_member += dvalue;
-  }
-
-  ~ExprVar()
-  {
-    eval.addDeriv(deriv_member);
-  }
-};
-
-
-template <typename T>
-struct ScalarExprTypeHelper<ExprVar<ScalarExpr<T>>&> {
-  using type = DualFloat;
-};
-
-
-template <typename T>
-DualFloat internal(ExprVar<ScalarExpr<T>> &v)
-{
-  return dual(v.value_member,v.deriv_member);
-}
-
-
-template <typename E>
-ScalarExpr<DualFloat> expr(ExprVar<ScalarExpr<E>> &v)
-{
-  return expr(v.value_member,v.deriv_member);
 }
 
 
@@ -109,6 +61,12 @@ struct ScalarExprVar {
 };
 
 
+template <typename M>
+struct ScalarExprVar<ScalarExpr<M>> : ScalarExprVar<M> {
+  ScalarExprVar(const ScalarExpr<M> &expr) : ScalarExprVar<M>(expr.expr) { }
+};
+
+
 // Specialization when the expression is just a DualFloat.  We don't
 // need to store the value and the dual separately and we don't need
 // to add the derivative in the destructor.
@@ -127,6 +85,19 @@ struct ScalarExprVar<DualFloat> {
 
   DualFloat dual() { return expr; }
 };
+
+
+template <typename T>
+struct ScalarExprTypeHelper<ScalarExprVar<T>&> {
+  using type = DualFloat;
+};
+
+
+template <typename T>
+DualFloat internal(ScalarExprVar<T> &v)
+{
+  return v.dual();
+}
 
 
 inline float evaluate(const DualFloat &dual)

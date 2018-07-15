@@ -1,6 +1,5 @@
 #include "dualvec3.hpp"
 #include "scalarexpr.hpp"
-#include "exprvar.hpp"
 
 template <typename Expr>
 struct Vec3Expr {
@@ -42,13 +41,6 @@ struct Vec3Expr<DualVec3> {
 };
 
 
-template <typename E>
-Vec3Expr<DualVec3> expr(ExprVar<Vec3Expr<E>> &v)
-{
-  return expr(v.value_member,v.deriv_member);
-}
-
-
 template <typename T> auto internal(Vec3Expr<T> e)
 {
   return e.expr;
@@ -58,46 +50,6 @@ template <typename T> auto internal(Vec3Expr<T> e)
 inline DualVec3 internal(const DualVec3& e)
 {
   return e;
-}
-
-
-template <typename Expr>
-struct ExprVar<Vec3Expr<Expr>> {
-  Evaluator<Expr> eval;
-  FloatVec3 value_member;
-  FloatVec3 deriv_member;
-
-  ExprVar(const Vec3Expr<Expr> &expr)
-  : eval(expr.expr),
-    value_member(eval.value()),
-    deriv_member{0,0,0}
-  {
-  }
-
-  FloatVec3 value() const { return value_member; }
-
-  ~ExprVar()
-  {
-    eval.addDeriv(deriv_member);
-  }
-};
-
-
-template <typename T>
-struct Vec3ExprTypeHelper<ExprVar<Vec3Expr<T>>> {
-  using type = DualVec3;
-};
-
-
-template <typename T>
-struct Vec3ExprTypeHelper<ExprVar<Vec3Expr<T>>&> {
-  using type = DualVec3;
-};
-
-
-template <typename T> DualVec3 internal(ExprVar<Vec3Expr<T>> &e)
-{
-  return dual(e.value_member,e.deriv_member);
 }
 
 
@@ -230,6 +182,30 @@ struct Vec3ExprVar {
   }
 };
 
+
+template <typename M>
+struct Vec3ExprVar<Vec3Expr<M>> : Vec3ExprVar<M> {
+  Vec3ExprVar(const Vec3Expr<M> &arg) : Vec3ExprVar<M>(arg.expr) { }
+};
+
+
+template <typename M>
+struct Vec3ExprTypeHelper<Vec3ExprVar<M>> {
+  using type = DualVec3;
+};
+
+
+template <typename M>
+struct Vec3ExprTypeHelper<Vec3ExprVar<M>&> {
+  using type = DualVec3;
+};
+
+
+template <typename M>
+DualVec3 internal(Vec3ExprVar<Vec3Expr<M>> &v)
+{
+  return v.dual();
+}
 
 template <typename M>
 Vec3Expr<DualVec3> expr(Vec3ExprVar<M> &v)

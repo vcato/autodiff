@@ -46,51 +46,6 @@ inline Mat33<T> internal(const Mat33<T> &e)
 }
 
 
-template <typename Expr>
-struct ExprVar<Mat33Expr<Expr>> {
-  Evaluator<Expr> eval;
-
-  DVar<FloatMat33> expr;
-
-  ExprVar(const Mat33Expr<Expr> &expr)
-  : eval(expr.expr),
-    expr{eval.value(),zeroMat33()}
-  {
-  }
-
-  FloatMat33 value() const { return expr.value; }
-
-  void addDeriv(const FloatMat33 &dvalue)
-  {
-    expr.deriv += dvalue;
-  }
-
-  ~ExprVar()
-  {
-    eval.addDeriv(expr.deriv);
-  }
-};
-
-
-template <typename Expr>
-struct Mat33ExprTypeHelper<ExprVar<Mat33Expr<Expr>>> {
-  using type = DualMat33;
-};
-
-
-template <typename Expr>
-struct Mat33ExprTypeHelper<ExprVar<Mat33Expr<Expr>>&> {
-  using type = DualMat33;
-};
-
-
-template <typename Expr>
-DualMat33 internal(ExprVar<Mat33Expr<Expr>> &v)
-{
-  return dual(v.expr.value,v.expr.deriv);
-}
-
-
 template <>
 struct Mat33Expr<DualMat33> {
   DualMat33 expr;
@@ -239,6 +194,27 @@ struct Mat33ExprVar {
   {
     eval.addDeriv(deriv);
   }
+
+  template <typename Self>
+  static auto element(Self &arg,int i,int j)
+  {
+    assert(i>=0);
+    assert(i<3);
+    assert(j>=0);
+    assert(j<3);
+    return ScalarExpr<DualFloat>{
+      ::dual(arg._value[i][j],arg.deriv[i][j])
+    };
+  }
+
+  auto operator[](int i)             { return row(*this,i); }
+  auto operator[](int i) const       { return row(*this,i); }
+};
+
+
+template <typename M>
+struct Mat33ExprVar<Mat33Expr<M>> : Mat33ExprVar<M> {
+  Mat33ExprVar(const Mat33Expr<M> &expr) : Mat33ExprVar<M>(expr.expr) { }
 };
 
 
@@ -293,6 +269,19 @@ struct Mat33ExprVar<DualMat33> {
   void addDeriv(const FloatMat33 &deriv) { ::addDeriv(expr,deriv); }
 
   DualMat33 dual() { return expr; }
+
+  template <typename Self>
+  static auto element(Self &arg,int i,int j)
+  {
+    assert(i>=0);
+    assert(i<3);
+    assert(j>=0);
+    assert(j<3);
+    return ScalarExpr<DualFloat>{ arg.expr[i][j] };
+  }
+
+  auto operator[](int i)             { return row(*this,i); }
+  auto operator[](int i) const       { return row(*this,i); }
 };
 
 
@@ -321,8 +310,9 @@ template <typename A,typename B>
 struct Evaluator<Mat33Div<A,B>> {
   Mat33ExprVar<A> a;
   ScalarExprVar<B> b;
-  Evaluator<decltype(genMat33Div(expr(a),expr(b)).expr)>
-    result{ genMat33Div(expr(a),expr(b)).expr };
+
+  Evaluator<decltype(genMat33Div(a,b).expr)>
+    result{ genMat33Div(a,b).expr };
 
   Evaluator(const Mat33Div<A,B> &expr)
   : a(expr.a),

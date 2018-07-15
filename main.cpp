@@ -431,7 +431,7 @@ static QRDecomposition<float> qrDecomposed(const Mat33<float> &a)
   // u1 = q1*mag(u1)
   // a1 = q1*r11
   // r11 = mag(u1)
-  T r11 = mag(u1);
+  auto r11 = mag(u1);
 
   // q1 = u1/mag(u1)
   // q1 = u1/r11
@@ -448,12 +448,12 @@ static QRDecomposition<float> qrDecomposed(const Mat33<float> &a)
   // a2 = q1*dot(q1,a2) + q2*mag(u2)
   // a2 = q1*r12 + q2*r22
   // r12 = dot(q1,a2)
-  T r12 = dot(a2,q1);
+  auto r12 = dot(a2,q1);
   // u2 = a2 - q1*dot(q1,a2)
   // u2 = a2 - q1*r12
   auto u2 = a2 - q1*r12;
   // r22 = mag(u2)
-  T r22 = mag(u2);
+  auto r22 = mag(u2);
   // q2 = u2/mag(u2)
   // q2 = u2/r22
   auto q2 = u2/r22;
@@ -465,14 +465,14 @@ static QRDecomposition<float> qrDecomposed(const Mat33<float> &a)
   // a3 = q1*dot(q1,a3) + q2*dot(q2,a3) + q3*mag(u3)
   // a3 = q1*r13 + q2*r23 + q3*r33
   // r13 = dot(q1,a3)
-  T r13 = dot(q1,a3);
+  auto r13 = dot(q1,a3);
   // r23 = dot(q2,a3)
-  T r23 = dot(q2,a3);
+  auto r23 = dot(q2,a3);
   // r33 = mag(u3)
   // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
   // u3 = a3 - q1*r13 - q2*r23
   auto u3 = a3 - q1*r13 - q2*r23;
-  T r33 = mag(u3);
+  auto r33 = mag(u3);
   // q3 = u3/mag(u3)
   // q3 = u3/r33
   auto q3 = u3/r33;
@@ -483,7 +483,7 @@ static QRDecomposition<float> qrDecomposed(const Mat33<float> &a)
     {  0,  0,r33}
   };
 
-  Mat33<T> q = columns(q1,q2,q3);
+  auto q = columns(q1,q2,q3);
   Mat33<T> r(r_values);
 
   return {q,r};
@@ -713,7 +713,8 @@ static void testDualVec3Evaluator()
   FloatVec3 a{1,2,3};
   FloatVec3 da{0,0,0};
   FloatVec3 dresult{1,0,0};
-  evalAndAddDeriv(dual(a,da),dresult);
+  FloatVec3 result = evalAndAddDeriv(dual(a,da),dresult);
+  assert(result==a);
   auto f = [&]{ return a.x(); };
   assertNear(da,finiteDeriv(f,a),1e-4);
 }
@@ -760,7 +761,13 @@ static void testMat33Evaluator()
   auto e = Mat33<Element>(values);
   FloatMat33 dresult = randomMat33(random_engine);
 
-  evalAndAddDeriv(e,dresult);
+  FloatMat33 result = evalAndAddDeriv(e,dresult);
+
+  for (int i=0; i!=3; ++i) {
+    for (int j=0; j!=3; ++j) {
+      assert(result[i][j]==mat[i][j]+1);
+    }
+  }
 
   assertNear(dmat,dresult,0);
 }
@@ -800,7 +807,8 @@ static void testCofactorMatrixEvaluator()
   FloatMat33 mat = randomMat33(random_engine);
   FloatMat33 dmat = zeroMat33();
   FloatMat33 dresult = randomMat33(random_engine);
-  evalAndAddDeriv(cofactorMatrix(dual(mat,dmat)),dresult);
+  FloatMat33 result = evalAndAddDeriv(cofactorMatrix(dual(mat,dmat)),dresult);
+  assert(result==cofactorMatrix(mat));
   auto f = [&]{ return weightedSum(cofactorMatrix(mat),dresult); };
   assertNear(dmat,finiteDeriv(f,mat),2e-4);
 }
@@ -841,7 +849,8 @@ static void testMat33MulEvaluator()
     FloatMat33 da = zeroMat33();
     FloatMat33 db = zeroMat33();
     FloatMat33 dresult = randomMat33(random_engine);
-    evalAndAddDeriv(dual(a,da)*dual(b,db),dresult);
+    FloatMat33 result = evalAndAddDeriv(dual(a,da)*dual(b,db),dresult);
+    assert(result==a*b);
     auto f = [&]{ return weightedSum(a*b,dresult); };
     assertNear(da,finiteDeriv(f,a),1e-4);
     assertNear(db,finiteDeriv(f,b),1e-4);
@@ -855,7 +864,9 @@ static void testMat33MulEvaluator()
     FloatMat33 db = zeroMat33();
     FloatMat33 dc = zeroMat33();
     FloatMat33 dresult = randomMat33(random_engine);
-    evalAndAddDeriv(dual(a,da)*dual(b,db)*dual(c,dc),dresult);
+    FloatMat33 result =
+      evalAndAddDeriv(dual(a,da)*dual(b,db)*dual(c,dc),dresult);
+    assert(result==a*b*c);
     auto f = [&]{ return weightedSum(a*b*c,dresult); };
     assertNear(da,finiteDeriv(f,a),1e-4);
     assertNear(db,finiteDeriv(f,b),1e-4);
@@ -919,7 +930,8 @@ static void testDotEvaluator()
     {
       auto a = vec3(2,dual(3,dv),4);
       auto b = vec3(5,6,7);
-      evalAndAddDeriv(dot(a,b),1);
+      float result = evalAndAddDeriv(dot(a,b),1);
+      assert(result==dot(vec3(2,3,4),vec3(5,6,7)));
     }
     assertNear(dv,6.0f,1e-4);
   }
@@ -1012,7 +1024,8 @@ static void testRotXEvaluator()
   float a = randomFloat(-1,1,random_engine);
   float da = 0;
   FloatMat33 dresult = randomMat33(random_engine);
-  evalAndAddDeriv(rotX(dual(a,da)),dresult);
+  FloatMat33 result = evalAndAddDeriv(rotX(dual(a,da)),dresult);
+  assert(result==rotX(a));
   auto f = [&]{ return weightedSum(rotX(a),dresult); };
   assertNear(da,finiteDeriv(f,a),1e-4);
 }

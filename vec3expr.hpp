@@ -16,6 +16,12 @@ struct Vec3ExprTypeHelper<Vec3Expr<T>> {
 
 
 template <>
+struct Vec3ExprTypeHelper<FloatVec3> {
+  using type = FloatVec3;
+};
+
+
+template <>
 struct Vec3ExprTypeHelper<DualVec3> {
   using type = DualVec3;
 };
@@ -47,6 +53,12 @@ inline DualVec3 internal(const DualVec3& e)
 }
 
 
+inline FloatVec3 internal(const FloatVec3& e)
+{
+  return e;
+}
+
+
 template <typename X,typename Y,typename Z>
 struct Vec3Func {
   X x;
@@ -73,6 +85,22 @@ static Vec3Expr<Vec3Func<A,B,C>>
   auto f = Vec3Func<A,B,C>{internal(a),internal(b),internal(c)};
   return Vec3Expr<Vec3Func<A,B,C>>{f};
 }
+
+
+
+template <typename T>
+struct Evaluator<Vec3<T>> {
+  Vec3<T> expr;
+
+  Evaluator(const Vec3<T> &expr)
+  : expr(expr)
+  {
+  }
+
+  FloatVec3 value() const { return expr; }
+
+  void addDeriv(const FloatVec3 &) { }
+};
 
 
 template <typename X,typename Y,typename Z>
@@ -336,13 +364,6 @@ struct Evaluator<Vec3Mag<V>> {
 
 template <typename VExpr,typename V=Vec3ExprType<VExpr>>
 ScalarExpr<Vec3Mag<V>> mag(const VExpr &v)
-{
-  return {{internal(v)}};
-}
-
-
-template <typename VExpr,typename V=Vec3ExprType<VExpr>>
-ScalarExpr<Vec3Mag<V>> mag(VExpr &v)
 {
   return {{internal(v)}};
 }

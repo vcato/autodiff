@@ -54,6 +54,18 @@ inline Vec3<float> operator+(const Vec3<float> &a,const Vec3<float> &b)
 }
 
 
+inline Vec3<float> vec3(float x,float y,float z)
+{
+  return {x,y,z};
+}
+
+
+inline Vec3<float> vec3(int x,int y,int z)
+{
+  return {float(x),float(y),float(z)};
+}
+
+
 Vec3<float> operator-(const Vec3<float> &a,const Vec3<float> &b)
 {
   return {a.x() - b.x(), a.y() - b.y(), a.z() - b.z()};

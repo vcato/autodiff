@@ -9,27 +9,35 @@ struct Mat33Expr {
 };
 
 
+template <typename T>
+struct DVar {
+  T value;
+  T deriv;
+};
+
+
 template <typename Expr>
 struct ExprVar<Mat33Expr<Expr>> {
   Evaluator<Expr> eval;
-  FloatMat33 value_member = eval.value();
-  FloatMat33 deriv_member = zeroMat33();
+
+  DVar<FloatMat33> expr;
 
   ExprVar(const Mat33Expr<Expr> &expr)
-  : eval(expr.expr)
+  : eval(expr.expr),
+    expr{eval.value(),zeroMat33()}
   {
   }
 
-  FloatMat33 value() const { return value_member; }
+  FloatMat33 value() const { return expr.value; }
 
   void addDeriv(const FloatMat33 &dvalue)
   {
-    deriv_member += dvalue;
+    expr.deriv += dvalue;
   }
 
   ~ExprVar()
   {
-    eval.addDeriv(deriv_member);
+    eval.addDeriv(expr.deriv);
   }
 };
 
@@ -139,17 +147,6 @@ struct Evaluator<Mat33Mul<A,B>> {
 };
 
 
-
-
-template <typename ExprWrapper,typename Value>
-Value evalAndAddDeriv(const ExprWrapper &mat33_expr,const Value& dresult)
-{
-  auto e = mat33_expr.expr;
-  Evaluator<decltype(e)> eval(e);
-  Value result = eval.value();
-  eval.addDeriv(dresult);
-  return result;
-}
 
 
 inline void addDeriv(const DualFloat &dual,float dresult)

@@ -11,6 +11,7 @@
 #include "scalarexpr.hpp"
 #include "vec3expr.hpp"
 #include "mat33expr.hpp"
+#include "evalandaddderiv.hpp"
 
 #define assertNear(actual,expected,tolerance) \
   (assertNearHelper(actual,expected,tolerance,__FILE__,__LINE__))
@@ -301,15 +302,15 @@ struct ExprVar {
 
 
 template <typename T>
-static Mat33Expr<DualMat33> expr(const ExprVar<Mat33Expr<T>> &v)
+static Mat33Expr<DualMat33> expr(ExprVar<Mat33Expr<T>> &v)
 {
-  return {v.value,v.deriv};
+  return {dual(v.expr.value,v.expr.deriv)};
 }
 
 
 template <typename A>
 struct Evaluator<QRDecomposed<A>> {
-  Mat33ExprVar<A> a;
+  ExprVar<Mat33Expr<A>> a;
 
   // Make q*r == a
   // q is an orthogonal matrix
@@ -412,7 +413,7 @@ struct Evaluator<QRDecomposed<A>> {
     columns(expr(q1),expr(q2),expr(q3));
 
   Evaluator(const QRDecomposed<A> &expr)
-  : a(expr.a)
+  : a({expr.a})
   {
   }
 
@@ -1241,6 +1242,7 @@ static void testExprVar3()
   auto f = [&]{ return weightedSum(vec3(col(a,0)),dresult); };
   assertNear(da,finiteDeriv(f,a),1e-4);
 }
+
 
 
 static void testQRDecompositionEvaluator()

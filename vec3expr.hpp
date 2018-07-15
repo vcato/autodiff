@@ -1,5 +1,6 @@
 #include "dualvec3.hpp"
 #include "scalarexpr.hpp"
+#include "exprvar.hpp"
 
 template <typename Expr>
 struct Vec3Expr {
@@ -14,6 +15,35 @@ struct Vec3Expr<DualVec3> {
   ScalarExpr<DualFloat> x() const { return {expr.x()}; }
   ScalarExpr<DualFloat> y() const { return {expr.y()}; }
   ScalarExpr<DualFloat> z() const { return {expr.z()}; }
+};
+
+
+template <typename E>
+Vec3Expr<DualVec3> expr(ExprVar<Vec3Expr<E>> &v)
+{
+  return expr(v.value_member,v.deriv_member);
+}
+
+
+template <typename Expr>
+struct ExprVar<Vec3Expr<Expr>> {
+  Evaluator<Expr> eval;
+  FloatVec3 value_member;
+  FloatVec3 deriv_member;
+
+  ExprVar(const Vec3Expr<Expr> &expr)
+  : eval(expr.expr),
+    value_member(eval.value()),
+    deriv_member{0,0,0}
+  {
+  }
+
+  FloatVec3 value() const { return value_member; }
+
+  ~ExprVar()
+  {
+    eval.addDeriv(deriv_member);
+  }
 };
 
 
@@ -204,3 +234,173 @@ struct Evaluator<Vec3Add<A,B>> {
     b_eval.addDeriv(deriv);
   }
 };
+
+
+template <typename A,typename B>
+struct Vec3Sub {
+  A a;
+  B b;
+};
+
+
+template <typename A,typename B>
+Vec3Expr<Vec3Sub<A,B>> operator-(const Vec3Expr<A> &a,const Vec3Expr<B> &b)
+{
+  return {{a.expr,b.expr}};
+}
+
+
+template <typename A,typename B>
+struct Evaluator<Vec3Sub<A,B>> {
+  Evaluator<A> a_eval;
+  Evaluator<B> b_eval;
+
+  Evaluator(const Vec3Sub<A,B> &expr)
+  : a_eval(expr.a),
+    b_eval(expr.b)
+  {
+  }
+
+  FloatVec3 value() const
+  {
+    return a_eval.value() - b_eval.value();
+  }
+
+  void addDeriv(const FloatVec3 &deriv)
+  {
+    a_eval.addDeriv(deriv);
+    b_eval.addDeriv(-deriv);
+  }
+};
+
+
+template <typename V>
+struct Vec3Mag {
+  V v;
+};
+
+
+#if 1
+template <typename V>
+struct Evaluator<Vec3Mag<V>> {
+  Vec3ExprVar<V> v;
+  Evaluator<decltype(sqrt(dot(expr(v),expr(v))).expr)> result_eval =
+    sqrt(dot(expr(v),expr(v))).expr;
+
+  Evaluator(const Vec3Mag<V> &expr)
+  : v(expr.v)
+  {
+  }
+
+  float value() const { return result_eval.value(); }
+
+  void addDeriv(float dvalue)
+  {
+    result_eval.addDeriv(dvalue);
+  }
+};
+#endif
+
+
+template <typename V>
+ScalarExpr<Vec3Mag<V>> mag(const Vec3Expr<V> &v)
+{
+  return {{v.expr}};
+}
+
+
+template <typename A,typename B>
+struct Vec3Mul {
+  A a;
+  B b;
+};
+
+
+template <typename A,typename B>
+struct Evaluator<Vec3Mul<A,B>> {
+  Vec3ExprVar<A> a;
+  ScalarExprVar<B> b;
+
+  static auto result(Vec3ExprVar<A> &a,ScalarExprVar<B> &b) {
+    return
+      vec3(
+        expr(a).x()*expr(b),
+        expr(a).y()*expr(b),
+        expr(a).z()*expr(b)
+      ).expr;
+  }
+
+  Evaluator<decltype(result(a,b))> result_eval{result(a,b)};
+
+  Evaluator(const Vec3Mul<A,B> &expr)
+  : a(expr.a),
+    b(expr.b)
+  {
+  }
+
+  FloatVec3 value() const { return result_eval.value(); }
+
+  void addDeriv(const FloatVec3 &deriv)
+  {
+    result_eval.addDeriv(deriv);
+  }
+};
+
+
+template <typename A,typename B>
+Vec3Expr<Vec3Mul<A,B>> operator*(const Vec3Expr<A> &a,ScalarExpr<B> b)
+{
+  return {{a.expr,b.expr}};
+}
+
+
+template <typename A,typename B>
+Vec3Expr<Vec3Mul<A,B>> operator*(ScalarExpr<B> b,const Vec3Expr<A> &a)
+{
+  return {{a.expr,b.expr}};
+}
+
+
+template <typename A,typename B>
+struct Vec3Div {
+  A a;
+  B b;
+};
+
+
+template <typename A,typename B>
+struct Evaluator<Vec3Div<A,B>> {
+  Vec3ExprVar<A> a;
+  ScalarExprVar<B> b;
+
+  static auto result(Vec3ExprVar<A> &a,ScalarExprVar<B> &b) {
+    return
+      vec3(
+        expr(a).x()/expr(b),
+        expr(a).y()/expr(b),
+        expr(a).z()/expr(b)
+      ).expr;
+  }
+
+  Evaluator<decltype(result(a,b))> result_eval{result(a,b)};
+
+  Evaluator(const Vec3Div<A,B> &expr)
+  : a(expr.a),
+    b(expr.b)
+  {
+  }
+
+  FloatVec3 value() const { return result_eval.value(); }
+
+  void addDeriv(const FloatVec3 &deriv)
+  {
+    result_eval.addDeriv(deriv);
+  }
+};
+
+
+template <typename A,typename B>
+Vec3Expr<Vec3Div<A,B>> operator/(const Vec3Expr<A> &a,ScalarExpr<B> b)
+{
+  return {{a.expr,b.expr}};
+}

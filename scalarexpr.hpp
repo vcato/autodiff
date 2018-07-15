@@ -3,6 +3,8 @@
 
 
 #include "evaluator.hpp"
+#include "exprvar.hpp"
+
 
 
 template <typename Expr>
@@ -14,6 +16,40 @@ struct ScalarExpr {
 inline ScalarExpr<DualFloat> expr(float value,float &deriv)
 {
   return {{value,deriv}};
+}
+
+
+template <typename Expr>
+struct ExprVar<ScalarExpr<Expr>> {
+  Evaluator<Expr> eval;
+  float value_member;
+  float deriv_member;
+
+  ExprVar(const ScalarExpr<Expr> &expr)
+  : eval(expr.expr),
+    value_member(eval.value()),
+    deriv_member(0)
+  {
+  }
+
+  float value() const { return value_member; }
+
+  void addDeriv(float dvalue)
+  {
+    deriv_member += dvalue;
+  }
+
+  ~ExprVar()
+  {
+    eval.addDeriv(deriv_member);
+  }
+};
+
+
+template <typename E>
+ScalarExpr<DualFloat> expr(ExprVar<ScalarExpr<E>> &v)
+{
+  return expr(v.value_member,v.deriv_member);
 }
 
 
@@ -324,6 +360,39 @@ struct Evaluator<ScalarDiv<A,B>> {
     b_eval.addDeriv(deriv*-a/(b*b));
   }
 };
+
+
+template <typename X>
+struct Sqrt {
+  X x;
+};
+
+
+template <typename X>
+struct Evaluator<Sqrt<X>> {
+  Evaluator<X> x_eval;
+  float sqrt_x = sqrtf(x_eval.value());
+
+  Evaluator(const Sqrt<X> &expr)
+  : x_eval(expr.x)
+  {
+  }
+
+  float value() const { return sqrt_x; }
+
+  void addDeriv(float dvalue)
+  {
+    x_eval.addDeriv(dvalue*0.5/sqrt_x);
+  }
+};
+
+
+template <typename X>
+ScalarExpr<Sqrt<X>> sqrt(const ScalarExpr<X> &x)
+{
+  return {{x.expr}};
+}
+
 
 
 inline ScalarExpr<float> expr(float x)

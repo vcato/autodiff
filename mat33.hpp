@@ -102,6 +102,19 @@ struct Mat33 {
   auto operator[](int i)             { return row(*this,i); }
   auto operator[](int i) const       { return row(*this,i); }
 
+  bool operator==(const Mat33 &arg) const
+  {
+    for (int i=0; i!=3; ++i) {
+      for (int j=0; j!=3; ++j) {
+        if (values[i][j] != arg.values[i][j]) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
   T values[3][3];
 };
 
@@ -287,6 +300,13 @@ inline FloatMat33 rotX(float angle)
 
 template <typename T>
 inline Vec3<T> vec3(ColRef<const Mat33<T>> c)
+{
+  return {c[0],c[1],c[2]};
+}
+
+
+template <typename T>
+inline Vec3<T> vec3(ColRef<Mat33<T>> c)
 {
   return {c[0],c[1],c[2]};
 }

@@ -1,4 +1,4 @@
-#CXX=clang++
+CXX=clang++
 CXXFLAGS=-W -Wall -pedantic -std=c++14 -MD -MP
 
 run_main: main.pass

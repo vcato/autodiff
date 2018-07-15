@@ -9,6 +9,31 @@ struct Mat33Expr {
 };
 
 
+template <typename Expr>
+struct ExprVar<Mat33Expr<Expr>> {
+  Evaluator<Expr> eval;
+  FloatMat33 value_member = eval.value();
+  FloatMat33 deriv_member = zeroMat33();
+
+  ExprVar(const Mat33Expr<Expr> &expr)
+  : eval(expr.expr)
+  {
+  }
+
+  FloatMat33 value() const { return value_member; }
+
+  void addDeriv(const FloatMat33 &dvalue)
+  {
+    deriv_member += dvalue;
+  }
+
+  ~ExprVar()
+  {
+    eval.addDeriv(deriv_member);
+  }
+};
+
+
 template <>
 struct Mat33Expr<DualMat33> {
   DualMat33 expr;
@@ -485,3 +510,48 @@ struct Evaluator<RotX<Angle>> {
 };
 
 
+template <typename C1,typename C2,typename C3>
+struct ColumnsFunc
+{
+  C1 c1;
+  C2 c2;
+  C3 c3;
+};
+
+
+template <typename C1,typename C2,typename C3>
+struct Evaluator<ColumnsFunc<C1,C2,C3>> {
+  Evaluator<C1> c1_eval;
+  Evaluator<C2> c2_eval;
+  Evaluator<C3> c3_eval;
+
+  Evaluator(const ColumnsFunc<C1,C2,C3> &expr)
+  : c1_eval(expr.c1),
+    c2_eval(expr.c2),
+    c3_eval(expr.c3)
+  {
+  }
+
+  FloatMat33 value() const
+  {
+    FloatVec3 c1 = c1_eval.value();
+    FloatVec3 c2 = c2_eval.value();
+    FloatVec3 c3 = c3_eval.value();
+    return columns(c1,c2,c3);
+  }
+
+  void addDeriv(const FloatMat33 &deriv)
+  {
+    c1_eval.addDeriv(vec3(col(deriv,0)));
+    c2_eval.addDeriv(vec3(col(deriv,1)));
+    c3_eval.addDeriv(vec3(col(deriv,2)));
+  }
+};
+
+
+template <typename C1,typename C2,typename C3>
+Mat33Expr<ColumnsFunc<C1,C2,C3>>
+  columns(const Vec3Expr<C1> &c1,const Vec3Expr<C2> &c2,const Vec3Expr<C3> &c3)
+{
+  return {{c1.expr,c2.expr,c3.expr}};
+}

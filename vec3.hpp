@@ -24,6 +24,11 @@ class Vec3 {
       return stream;
     }
 
+    bool operator==(const Vec3 &arg) const
+    {
+      return _x==arg._x && _y==arg._y && _z==arg._z;
+    }
+
   private:
     T _x, _y, _z;
 };
@@ -57,6 +62,12 @@ Vec3<T> operator-(const Vec3<T> &a,const Vec3<T> &b)
 }
 
 
+template <typename T>
+Vec3<T> operator-(const Vec3<T> &v)
+{
+  return {-v.x(),-v.y(),-v.z()};
+}
+
 
 template <typename T>
 Vec3<T> operator/(const Vec3<T> &a,T b)
@@ -67,6 +78,13 @@ Vec3<T> operator/(const Vec3<T> &a,T b)
 
 template <typename T>
 Vec3<T> operator*(const Vec3<T> &a,T b)
+{
+  return {a.x()*b, a.y()*b, a.z()*b};
+}
+
+
+template <typename T>
+Vec3<T> operator*(T b,const Vec3<T> &a)
 {
   return {a.x()*b, a.y()*b, a.z()*b};
 }

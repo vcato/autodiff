@@ -1,6 +1,11 @@
+#include <cassert>
 #include "dualmat33.hpp"
 #include "scalarexpr.hpp"
 #include "evaluator.hpp"
+#include "mat33.hpp"
+
+
+namespace autodiff {
 
 
 template <typename Expr>
@@ -189,7 +194,7 @@ struct Mat33ExprVar {
 
   FloatMat33 value() const { return _value; }
   void addDeriv(const FloatMat33 &dvalue) { deriv += dvalue; }
-  DualMat33 dual() const { return ::dual(_value,deriv); }
+  DualMat33 dual() const { return autodiff::dual(_value,deriv); }
 
   Mat33ExprVar(const M &m)
   : eval(m)
@@ -209,7 +214,7 @@ struct Mat33ExprVar {
     assert(j>=0);
     assert(j<3);
     return ScalarExpr<DualFloat>{
-      ::dual(arg._value[i][j],arg.deriv[i][j])
+      autodiff::dual(arg._value[i][j],arg.deriv[i][j])
     };
   }
 
@@ -266,7 +271,7 @@ struct Mat33ExprVar<DualMat33> {
 
   FloatMat33 value() const { return evaluate(expr); }
 
-  void addDeriv(const FloatMat33 &deriv) { ::addDeriv(expr,deriv); }
+  void addDeriv(const FloatMat33 &deriv) { autodiff::addDeriv(expr,deriv); }
 
   DualMat33 dual() const { return expr; }
 
@@ -652,4 +657,74 @@ template <typename MExpr,typename M=Mat33ExprType<MExpr>>
 Mat33ColExpr<M> col(const MExpr &m,int j)
 {
   return {internal(m),j};
+}
+
+
+template <typename M>
+struct Evaluator<Mat33Element<M>> {
+  Evaluator<M> m_eval;
+  int i;
+  int j;
+
+  Evaluator(const Mat33Element<M> &expr)
+  : m_eval(expr.m),
+    i(expr.i),
+    j(expr.j)
+  {
+  }
+
+  float value() const { return m_eval.value()[i][j]; }
+
+  void addDeriv(float dvalue)
+  {
+    FloatMat33 dm = zeroMat33();
+    dm[i][j] = dvalue;
+
+    m_eval.addDeriv(dm);
+  }
+};
+
+
+template <typename M>
+struct Vec3FromCol {
+  M m;
+  int j;
+};
+
+
+template <typename M>
+static Vec3Expr<Vec3FromCol<M>> vec3(const Mat33ColExpr<M> &m)
+{
+  return {{m.m,m.j}};
+}
+
+
+template <typename M>
+struct Evaluator<Vec3FromCol<M>> {
+  Evaluator<M> m_eval;
+  int j;
+
+  Evaluator(const Vec3FromCol<M> &expr)
+  : m_eval(expr.m),
+    j(expr.j)
+  {
+  }
+
+  FloatVec3 value() const
+  {
+    FloatMat33 m = m_eval.value();
+    return vec3(col(m,j));
+  }
+
+  void addDeriv(const FloatVec3 &deriv)
+  {
+    FloatMat33 dm = zeroMat33();
+    dm[0][j] = deriv.x();
+    dm[1][j] = deriv.y();
+    dm[2][j] = deriv.z();
+    m_eval.addDeriv(dm);
+  }
+};
+
+
 }

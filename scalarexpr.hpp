@@ -5,6 +5,9 @@
 #include "evaluator.hpp"
 
 
+namespace autodiff {
+
+
 template <typename T> struct ScalarExprTypeHelper;
 
 
@@ -47,7 +50,7 @@ struct ScalarExprVar {
 
   float value() const { return _value; }
   void addDeriv(float dvalue) { deriv += dvalue; }
-  DualFloat dual() const { return ::dual(_value,deriv); }
+  DualFloat dual() const { return autodiff::dual(_value,deriv); }
 
   ScalarExprVar(const M &m)
   : eval(m)
@@ -452,5 +455,7 @@ inline ScalarExpr<float> expr(float x)
   return {x};
 }
 
+
+}
 
 #endif /* SCALAREXPR_HPP */

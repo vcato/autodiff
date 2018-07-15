@@ -1,3 +1,6 @@
+namespace autodiff {
+
+
 template <typename ExprWrapper,typename Value>
 Value evalAndAddDeriv(ExprWrapper &&wrapper,const Value& dresult)
 {
@@ -6,4 +9,7 @@ Value evalAndAddDeriv(ExprWrapper &&wrapper,const Value& dresult)
   Value result = eval.value();
   eval.addDeriv(dresult);
   return result;
+}
+
+
 }

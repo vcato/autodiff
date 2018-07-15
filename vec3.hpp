@@ -5,6 +5,9 @@
 #include <iostream>
 
 
+namespace autodiff {
+
+
 template <typename T>
 class Vec3 {
   public:
@@ -105,6 +108,9 @@ T mag(const Vec3<T> &v)
 
 
 using FloatVec3 = Vec3<float>;
+
+
+}
 
 
 

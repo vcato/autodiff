@@ -7,6 +7,9 @@
 #include "vec3.hpp"
 
 
+namespace autodiff {
+
+
 template <typename Matrix> decltype(auto) element(Matrix &matrix,int i,int j)
 {
   return matrix.element(matrix,i,j);
@@ -329,6 +332,9 @@ inline Mat33<T> columns(const Vec3<T> &c1,const Vec3<T> &c2,const Vec3<T> &c3)
   };
 
   return {values};
+}
+
+
 }
 
 

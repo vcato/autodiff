@@ -12,6 +12,8 @@
 #include "vec3expr.hpp"
 #include "mat33expr.hpp"
 #include "evalandaddderiv.hpp"
+#include "qrdecomposition.hpp"
+#include "qrdecomposedexpr.hpp"
 
 #define assertNear(actual,expected,tolerance) \
   (assertNearHelper(actual,expected,tolerance,__FILE__,__LINE__))
@@ -20,374 +22,25 @@
 using std::cerr;
 using std::ostream;
 using std::max;
+using autodiff::QRDecomposition;
+using autodiff::Mat33;
+using autodiff::FloatMat33;
+using autodiff::FloatVec3;
+using autodiff::mat33Identity;
+using autodiff::zeroMat33;
+using autodiff::evalAndAddDeriv;
+using autodiff::dual;
+using autodiff::ScalarAdd;
+using autodiff::DualFloat;
+using autodiff::DualVec3;
+using autodiff::DualMat33;
+using autodiff::ColRef;
+using autodiff::vec3;
+using autodiff::rotX;
+using autodiff::Vec3ExprVar;
+using autodiff::Mat33ExprVar;
+using autodiff::Evaluator;
 
-
-
-template <typename M>
-struct Evaluator<Mat33Element<M>> {
-  Evaluator<M> m_eval;
-  int i;
-  int j;
-
-  Evaluator(const Mat33Element<M> &expr)
-  : m_eval(expr.m),
-    i(expr.i),
-    j(expr.j)
-  {
-  }
-
-  float value() const { return m_eval.value()[i][j]; }
-
-  void addDeriv(float dvalue)
-  {
-    FloatMat33 dm = zeroMat33();
-    dm[i][j] = dvalue;
-
-    m_eval.addDeriv(dm);
-  }
-};
-
-
-
-template <typename M>
-struct Vec3FromCol {
-  M m;
-  int j;
-};
-
-
-template <typename M>
-static Vec3Expr<Vec3FromCol<M>> vec3(const Mat33ColExpr<M> &m)
-{
-  return {{m.m,m.j}};
-}
-
-
-static float max(float a,float b,float c)
-{
-  return std::max(std::max(a,b),c);
-}
-
-
-static float differenceBetween(float a,float b)
-{
-  return fabsf(a-b);
-}
-
-
-static float differenceBetween(const FloatVec3 &a,const FloatVec3 &b)
-{
-  float dx = differenceBetween(a.x(), b.x());
-  float dy = differenceBetween(a.y(), b.y());
-  float dz = differenceBetween(a.z(), b.z());
-
-  return max(dx,dy,dz);
-}
-
-
-static float differenceBetween(const FloatMat33 &a,const FloatMat33 &b)
-{
-  float max_d = -FLT_MAX;
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      float d = differenceBetween(a.values[i][j],b.values[i][j]);
-      max_d = max(max_d,d);
-    }
-  }
-
-  return max_d;
-}
-
-
-template <typename Function>
-static float finiteDeriv(Function f,float &v)
-{
-  float h = 1e-3;
-  float old_value = v;
-  v = old_value - h;
-  float value1 = f();
-  v = old_value + h;
-  float value2 = f();
-  v = old_value;
-  return (value2-value1)/(2*h);
-}
-
-
-template <typename Function>
-static FloatVec3 finiteDeriv(Function f,FloatVec3 &v)
-{
-  float x = finiteDeriv(f,v.x());
-  float y = finiteDeriv(f,v.y());
-  float z = finiteDeriv(f,v.z());
-
-  return {x,y,z};
-}
-
-
-template <typename Function>
-static FloatMat33 finiteDeriv(Function f,FloatMat33 &m)
-{
-  FloatMat33 result = zeroMat33();
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      result.values[i][j] = finiteDeriv(f,m.values[i][j]);
-    }
-  }
-
-  return result;
-}
-
-
-template <typename T>
-static void
-  assertNearHelper(
-    const T& actual,
-    const T& expected,
-    float tolerance,
-    const char *file,
-    int line
-  )
-{
-  float delta = differenceBetween(actual,expected);
-
-  if (delta<=tolerance) {
-    return;
-  }
-
-  cerr << "file: " << file << "\n";
-  cerr << "line: " << line << "\n";
-  cerr << "actual: " << actual << "\n";
-  cerr << "expected: " << expected << "\n";
-  cerr << "delta: " << delta << "\n";
-  cerr << "tolerance: " << tolerance << "\n";
-  assert(false);
-}
-
-
-static FloatVec3 randomVec3(RandomEngine &random_engine)
-{
-  float x = randomFloat(-1,1,random_engine);
-  float y = randomFloat(-1,1,random_engine);
-  float z = randomFloat(-1,1,random_engine);
-
-  return FloatVec3{x,y,z};
-}
-
-
-static FloatMat33 randomMat33(RandomEngine &random_engine)
-{
-  FloatVec3 x = randomVec3(random_engine);
-  FloatVec3 y = randomVec3(random_engine);
-  FloatVec3 z = randomVec3(random_engine);
-
-  float values[3][3] = {
-    {x.x(), x.y(), x.z()},
-    {y.x(), y.y(), y.z()},
-    {z.x(), z.y(), z.z()},
-  };
-
-  return FloatMat33(values);
-}
-
-
-static float weightedSum(const FloatVec3 &v,const FloatVec3 &w)
-{
-  float x = v.x()*w.x();
-  float y = v.y()*w.y();
-  float z = v.z()*w.z();
-
-  return x + y + z;
-}
-
-
-static float weightedSum(const FloatMat33 &m,const FloatMat33 &w)
-{
-  float result = 0;
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      result += m[i][j]*w[i][j];
-    }
-  }
-
-  return result;
-}
-
-
-namespace {
-template <typename T>
-struct QRDecomposition {
-  Mat33<T> q;
-  Mat33<T> r;
-};
-}
-
-
-namespace {
-template <typename T>
-static T
-  differenceBetween(const QRDecomposition<T> &a,const QRDecomposition<T> &b)
-{
-  return max(differenceBetween(a.q,b.q),differenceBetween(a.r,b.r));
-}
-}
-
-
-namespace {
-template <typename T>
-static ostream& operator<<(ostream &stream,const QRDecomposition<T> &qr)
-{
-  stream << "q:\n";
-  stream << qr.q << "\n";
-  stream << "r:\n";
-  stream << qr.r << "\n";
-  return stream;
-}
-}
-
-
-namespace {
-template <typename A>
-struct QRDecomposed {
-  A a;
-};
-}
-
-
-template <typename AExpr,typename A=Mat33ExprType<AExpr>>
-static Mat33Expr<QRDecomposed<A>> qrDecomposed(const AExpr &a)
-{
-  return {{internal(a)}};
-}
-
-
-template <typename A>
-struct Evaluator<QRDecomposed<A>> {
-  Mat33ExprVar<A> a;
-
-  // Make q*r == a
-  // q is an orthogonal matrix
-  // r is an upper triangular matrix
-
-  // a = q*r
-  // [a11,a12,a13]   [q11,q12,q13]   [r11,r12,r13]
-  // [a21,a22,a23] = [q21,q22,q23] * [  0,r22,r23]
-  // [a31,a32,a33]   [q31,a32,a33]   [  0,  0,r33]
-
-  // q1 = <q11,q21,q31>
-  // q2 = <q12,q22,q32>
-  // q3 = <q13,q23,q33>
-
-  // a1 = q1*r11
-  // a2 = q1*r12 + q2*r22
-  // a3 = q1*r13 + q2*r23 + q3*r33
-
-  // each ui is orthogonal to uj when i!=j
-  //   ui = ai - sum{j if j!=i}(dot(qj,ai)*qj)
-  // qi is the normalized version of ui
-  //   qi = ui/mag(ui)
-
-  // a1 = <a11,a21,a31>
-  // a2 = <a12,a22,a32>
-  // a3 = <a13,a23,a33>
-  Vec3ExprVar<decltype(vec3(col(a,0)))> a1 = vec3(col(a,0));
-  Vec3ExprVar<decltype(vec3(col(a,1)))> a2 = vec3(col(a,1));
-  Vec3ExprVar<decltype(vec3(col(a,2)))> a3 = vec3(col(a,2));
-
-  // We should be able to use Vec3ExprVar<decltype(a1)> here.
-  decltype(a1) &u1 = a1;
-
-  // u1 = a1
-  // q1 = u1/mag(u1)
-  // q1*mag(u1) = u1
-  // u1 = q1*mag(u1)
-  // a1 = q1*r11
-  // r11 = mag(u1)
-  ScalarExprVar<decltype(mag(u1))> r11 = mag(u1);
-
-  // q1 = u1/mag(u1)
-  // q1 = u1/r11
-  Vec3ExprVar<decltype(u1/r11)> q1 = u1/r11;
-
-  // u2 = a2 - q1*dot(q1,a2)
-  // u2 + q1*dot(q1,a2) = a2
-  // a2 = u2 + q1*dot(q1,a2)
-  // a2 = q1*dot(q1,a2) + u2
-  // q2 = u2/mag(u2)
-  // q2*mag(u2) = u2
-  // u2 = q2*mag(u2)
-  // a2 = u2 + q1*dot(q1,a2)
-  // a2 = q1*dot(q1,a2) + q2*mag(u2)
-  // a2 = q1*r12 + q2*r22
-  // r12 = dot(q1,a2)
-  ScalarExprVar<decltype(dot(a2,q1))> r12 = dot(a2,q1);
-
-  // u2 = a2 - q1*dot(q1,a2)
-  // u2 = a2 - q1*r12
-  Vec3ExprVar<decltype(a2 - q1*r12)> u2 = a2 - q1*r12;
-
-  // r22 = mag(u2)
-  ScalarExprVar<decltype(mag(u2))> r22 = mag(u2);
-
-  // q2 = u2/mag(u2)
-  // q2 = u2/r22
-  Vec3ExprVar<decltype(u2/r22)> q2 = u2/r22;
-
-  // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
-  // u3 + q1*dot(q1,a3) + q2*dot(q2,a3) = a3
-  // a3 = u3 + q1*dot(q1,a3) + q2*dot(q2,a3)
-  // a3 = q1*dot(q1,a3) + q2*dot(q2,a3) + u3
-  // a3 = q1*dot(q1,a3) + q2*dot(q2,a3) + q3*mag(u3)
-  // a3 = q1*r13 + q2*r23 + q3*r33
-  // r13 = dot(q1,a3)
-  ScalarExprVar<decltype(dot(q1,a3))> r13 = dot(q1,a3);
-
-  // r23 = dot(q2,a3)
-  ScalarExprVar<decltype(dot(q2,a3))> r23 = dot(q2,a3);
-
-  // r33 = mag(u3)
-  // u3 = a3 - q1*dot(q1,a3) - q2*dot(q2,a3)
-  // u3 = a3 - q1*r13 - q2*r23
-  Vec3ExprVar<decltype(a3 - q1*r13 - q2*r23)> u3 = a3 - q1*r13 - q2*r23;
-
-  // r33 = mag(u3)
-  ScalarExprVar<decltype(mag(u3))> r33 = mag(u3);
-
-  // q3 = u3/mag(u3)
-  // q3 = u3/r33
-  Vec3ExprVar<decltype(u3/r33)> q3 = u3/r33;
-
-  Mat33ExprVar<decltype(columns(q1,q2,q3))> q = columns(q1,q2,q3);
-
-  Evaluator(const QRDecomposed<A> &expr)
-  : a({expr.a})
-  {
-  }
-
-  QRDecomposition<float> value() const
-  {
-    float r_values[3][3] = {
-      {r11.value(),r12.value(),r13.value()},
-      {          0,r22.value(),r23.value()},
-      {          0,          0,r33.value()}
-    };
-
-    return {q.value(),r_values};
-  }
-
-  void addDeriv(const QRDecomposition<float> &deriv)
-  {
-    q.addDeriv(deriv.q);
-    r11.addDeriv(deriv.r[0][0]);
-    r12.addDeriv(deriv.r[0][1]);
-    r13.addDeriv(deriv.r[0][2]);
-    r22.addDeriv(deriv.r[1][1]);
-    r23.addDeriv(deriv.r[1][2]);
-    r33.addDeriv(deriv.r[2][2]);
-  }
-};
 
 
 
@@ -490,35 +143,171 @@ static QRDecomposition<float> qrDecomposed(const Mat33<float> &a)
 }
 
 
-template <typename M>
-struct Evaluator<Vec3FromCol<M>> {
-  Evaluator<M> m_eval;
-  int j;
+static float weightedSum(const FloatVec3 &v,const FloatVec3 &w)
+{
+  float x = v.x()*w.x();
+  float y = v.y()*w.y();
+  float z = v.z()*w.z();
 
-  Evaluator(const Vec3FromCol<M> &expr)
-  : m_eval(expr.m),
-    j(expr.j)
-  {
+  return x + y + z;
+}
+
+
+static float weightedSum(const FloatMat33 &m,const FloatMat33 &w)
+{
+  float result = 0;
+
+  for (int i=0; i!=3; ++i) {
+    for (int j=0; j!=3; ++j) {
+      result += m[i][j]*w[i][j];
+    }
   }
 
-  FloatVec3 value() const
-  {
-    FloatMat33 m = m_eval.value();
-    return vec3(col(m,j));
+  return result;
+}
+
+
+static float max(float a,float b,float c)
+{
+  return std::max(std::max(a,b),c);
+}
+
+
+static float differenceBetween(float a,float b)
+{
+  return fabsf(a-b);
+}
+
+
+static float differenceBetween(const FloatVec3 &a,const FloatVec3 &b)
+{
+  float dx = differenceBetween(a.x(), b.x());
+  float dy = differenceBetween(a.y(), b.y());
+  float dz = differenceBetween(a.z(), b.z());
+
+  return max(dx,dy,dz);
+}
+
+
+static float differenceBetween(const FloatMat33 &a,const FloatMat33 &b)
+{
+  float max_d = -FLT_MAX;
+
+  for (int i=0; i!=3; ++i) {
+    for (int j=0; j!=3; ++j) {
+      float d = differenceBetween(a.values[i][j],b.values[i][j]);
+      max_d = max(max_d,d);
+    }
   }
 
-  void addDeriv(const FloatVec3 &deriv)
-  {
-    FloatMat33 dm = zeroMat33();
-    dm[0][j] = deriv.x();
-    dm[1][j] = deriv.y();
-    dm[2][j] = deriv.z();
-    m_eval.addDeriv(dm);
+  return max_d;
+}
+
+
+template <typename T>
+static T
+  differenceBetween(const QRDecomposition<T> &a,const QRDecomposition<T> &b)
+{
+  return max(differenceBetween(a.q,b.q),differenceBetween(a.r,b.r));
+}
+
+
+
+static FloatVec3 randomVec3(RandomEngine &random_engine)
+{
+  float x = randomFloat(-1,1,random_engine);
+  float y = randomFloat(-1,1,random_engine);
+  float z = randomFloat(-1,1,random_engine);
+
+  return FloatVec3{x,y,z};
+}
+
+
+static FloatMat33 randomMat33(RandomEngine &random_engine)
+{
+  FloatVec3 x = randomVec3(random_engine);
+  FloatVec3 y = randomVec3(random_engine);
+  FloatVec3 z = randomVec3(random_engine);
+
+  float values[3][3] = {
+    {x.x(), x.y(), x.z()},
+    {y.x(), y.y(), y.z()},
+    {z.x(), z.y(), z.z()},
+  };
+
+  return FloatMat33(values);
+}
+
+
+template <typename Function>
+static float finiteDeriv(Function f,float &v)
+{
+  float h = 1e-3;
+  float old_value = v;
+  v = old_value - h;
+  float value1 = f();
+  v = old_value + h;
+  float value2 = f();
+  v = old_value;
+  return (value2-value1)/(2*h);
+}
+
+
+template <typename Function>
+static FloatVec3 finiteDeriv(Function f,FloatVec3 &v)
+{
+  float x = finiteDeriv(f,v.x());
+  float y = finiteDeriv(f,v.y());
+  float z = finiteDeriv(f,v.z());
+
+  return {x,y,z};
+}
+
+
+template <typename Function>
+static FloatMat33 finiteDeriv(Function f,FloatMat33 &m)
+{
+  FloatMat33 result = zeroMat33();
+
+  for (int i=0; i!=3; ++i) {
+    for (int j=0; j!=3; ++j) {
+      result.values[i][j] = finiteDeriv(f,m.values[i][j]);
+    }
   }
-};
+
+  return result;
+}
+
+
+
+template <typename T>
+static void
+  assertNearHelper(
+    const T& actual,
+    const T& expected,
+    float tolerance,
+    const char *file,
+    int line
+  )
+{
+  float delta = differenceBetween(actual,expected);
+
+  if (delta<=tolerance) {
+    return;
+  }
+
+  cerr << "file: " << file << "\n";
+  cerr << "line: " << line << "\n";
+  cerr << "actual: " << actual << "\n";
+  cerr << "expected: " << expected << "\n";
+  cerr << "delta: " << delta << "\n";
+  cerr << "tolerance: " << tolerance << "\n";
+  assert(false);
+}
 
 
 namespace tests {
+
 
 static void testRowAndCol()
 {

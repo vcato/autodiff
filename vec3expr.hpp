@@ -1,6 +1,8 @@
 #include "dualvec3.hpp"
 #include "scalarexpr.hpp"
 
+namespace autodiff {
+
 template <typename Expr>
 struct Vec3Expr {
   Expr expr;
@@ -191,7 +193,7 @@ struct Vec3ExprVar {
   mutable FloatVec3 deriv{0,0,0};
 
   FloatVec3 value() const { return _value; }
-  DualVec3 dual() const { return ::dual(_value,deriv); }
+  DualVec3 dual() const { return autodiff::dual(_value,deriv); }
 
   Vec3ExprVar(const M &m)
   : eval(m)
@@ -484,4 +486,7 @@ template <
 Vec3Expr<Vec3Div<A,B>> operator/(const AExpr &a,const BExpr& b)
 {
   return {{internal(a),internal(b)}};
+}
+
+
 }

@@ -4,6 +4,8 @@
 #include "mat33.hpp"
 #include "dualfloat.hpp"
 
+namespace autodiff {
+
 
 using DualMat33 = Mat33<DualFloat>;
 
@@ -17,6 +19,9 @@ inline DualMat33 dual(Mat33<float> v,Mat33<float> &dv)
   };
 
   return DualMat33(values);
+}
+
+
 }
 
 

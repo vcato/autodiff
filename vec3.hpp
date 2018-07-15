@@ -35,7 +35,7 @@ class Vec3 {
 
 
 template <typename A,typename B>
-auto genDot(const A a,const B b)
+auto genDot(const A& a,const B& b)
 {
   return a.x()*b.x() + a.y()*b.y() + a.z()*b.z();
 }

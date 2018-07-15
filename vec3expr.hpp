@@ -15,12 +15,6 @@ struct Vec3ExprTypeHelper<Vec3Expr<T>> {
 };
 
 
-template <typename T>
-struct Vec3ExprTypeHelper<Vec3Expr<T>&> {
-  using type = T;
-};
-
-
 template <>
 struct Vec3ExprTypeHelper<DualVec3> {
   using type = DualVec3;
@@ -136,7 +130,7 @@ template <
   typename A=Vec3ExprType<AExpr>,
   typename B=Vec3ExprType<BExpr>
 >
-ScalarExpr<Dot<A,B>> dot(AExpr &&a,BExpr &&b)
+ScalarExpr<Dot<A,B>> dot(const AExpr &a,const BExpr &b)
 {
   return {{internal(a),internal(b)}};
 }
@@ -166,10 +160,10 @@ template <typename M>
 struct Vec3ExprVar {
   Evaluator<M> eval;
   FloatVec3 _value = eval.value();
-  FloatVec3 deriv{0,0,0};
+  mutable FloatVec3 deriv{0,0,0};
 
   FloatVec3 value() const { return _value; }
-  DualVec3 dual() { return ::dual(_value,deriv); }
+  DualVec3 dual() const { return ::dual(_value,deriv); }
 
   Vec3ExprVar(const M &m)
   : eval(m)
@@ -196,13 +190,7 @@ struct Vec3ExprTypeHelper<Vec3ExprVar<M>> {
 
 
 template <typename M>
-struct Vec3ExprTypeHelper<Vec3ExprVar<M>&> {
-  using type = DualVec3;
-};
-
-
-template <typename M>
-DualVec3 internal(Vec3ExprVar<Vec3Expr<M>> &v)
+DualVec3 internal(const Vec3ExprVar<Vec3Expr<M>> &v)
 {
   return v.dual();
 }
@@ -290,7 +278,7 @@ template <
   typename A=Vec3ExprType<AExpr>,
   typename B=Vec3ExprType<BExpr>
 >
-Vec3Expr<Vec3Sub<A,B>> operator-(AExpr &&a,BExpr &&b)
+Vec3Expr<Vec3Sub<A,B>> operator-(const AExpr &a,const BExpr &b)
 {
   return {{internal(a),internal(b)}};
 }
@@ -410,7 +398,7 @@ template <
   typename A=Vec3ExprType<AExpr>,
   typename B=ScalarExprType<BExpr>
 >
-Vec3Expr<Vec3Mul<A,B>> operator*(AExpr&& a,BExpr &&b)
+Vec3Expr<Vec3Mul<A,B>> operator*(const AExpr& a,const BExpr &b)
 {
   return {{internal(a),internal(b)}};
 }
@@ -472,7 +460,7 @@ template <
   typename A=Vec3ExprType<AExpr>,
   typename B=ScalarExprType<BExpr>
 >
-Vec3Expr<Vec3Div<A,B>> operator/(AExpr &&a,BExpr&& b)
+Vec3Expr<Vec3Div<A,B>> operator/(const AExpr &a,const BExpr& b)
 {
   return {{internal(a),internal(b)}};
 }

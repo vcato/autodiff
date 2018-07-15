@@ -185,11 +185,11 @@ template <typename M>
 struct Mat33ExprVar {
   Evaluator<M> eval;
   FloatMat33 _value = eval.value();
-  FloatMat33 deriv = zeroMat33();
+  mutable FloatMat33 deriv = zeroMat33();
 
   FloatMat33 value() const { return _value; }
   void addDeriv(const FloatMat33 &dvalue) { deriv += dvalue; }
-  DualMat33 dual() { return ::dual(_value,deriv); }
+  DualMat33 dual() const { return ::dual(_value,deriv); }
 
   Mat33ExprVar(const M &m)
   : eval(m)
@@ -231,13 +231,7 @@ struct Mat33ExprTypeHelper<Mat33ExprVar<M>> {
 
 
 template <typename M>
-struct Mat33ExprTypeHelper<Mat33ExprVar<M>&> {
-  using type = DualMat33;
-};
-
-
-template <typename M>
-DualMat33 internal(Mat33ExprVar<M> &expr)
+DualMat33 internal(const Mat33ExprVar<M> &expr)
 {
   return expr.dual();
 }
@@ -274,7 +268,7 @@ struct Mat33ExprVar<DualMat33> {
 
   void addDeriv(const FloatMat33 &deriv) { ::addDeriv(expr,deriv); }
 
-  DualMat33 dual() { return expr; }
+  DualMat33 dual() const { return expr; }
 
   template <typename Self>
   static auto element(Self &arg,int i,int j)
@@ -627,7 +621,7 @@ template <
   typename C3=Vec3ExprType<C3Expr>
 >
 Mat33Expr<ColumnsFunc<C1,C2,C3>>
-  columns(C1Expr &&c1,C2Expr &&c2,C3Expr &&c3)
+  columns(const C1Expr &c1,const C2Expr &c2,const C3Expr &c3)
 {
   return {{internal(c1),internal(c2),internal(c3)}};
 }
@@ -655,7 +649,7 @@ struct Mat33ColExpr {
 
 
 template <typename MExpr,typename M=Mat33ExprType<MExpr>>
-Mat33ColExpr<M> col(MExpr &&m,int j)
+Mat33ColExpr<M> col(const MExpr &m,int j)
 {
   return {internal(m),j};
 }

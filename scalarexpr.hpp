@@ -43,11 +43,11 @@ template <typename M>
 struct ScalarExprVar {
   Evaluator<M> eval;
   float _value = eval.value();
-  float deriv = 0;
+  mutable float deriv = 0;
 
   float value() const { return _value; }
   void addDeriv(float dvalue) { deriv += dvalue; }
-  DualFloat dual() { return ::dual(_value,deriv); }
+  DualFloat dual() const { return ::dual(_value,deriv); }
 
   ScalarExprVar(const M &m)
   : eval(m)
@@ -83,18 +83,18 @@ struct ScalarExprVar<DualFloat> {
 
   void addDeriv(float dvalue) { expr.deriv += dvalue; }
 
-  DualFloat dual() { return expr; }
+  DualFloat dual() const { return expr; }
 };
 
 
 template <typename T>
-struct ScalarExprTypeHelper<ScalarExprVar<T>&> {
+struct ScalarExprTypeHelper<ScalarExprVar<T>> {
   using type = DualFloat;
 };
 
 
 template <typename T>
-DualFloat internal(ScalarExprVar<T> &v)
+DualFloat internal(const ScalarExprVar<T> &v)
 {
   return v.dual();
 }
@@ -144,18 +144,6 @@ struct ScalarExprTypeHelper<ScalarExpr<T>> {
 };
 
 
-template <typename T>
-struct ScalarExprTypeHelper<ScalarExpr<T>&> {
-  using type = T;
-};
-
-
-template <typename T>
-struct ScalarExprTypeHelper<const ScalarExpr<T> &> {
-  using type = T;
-};
-
-
 template <>
 struct ScalarExprTypeHelper<float> {
   using type = float;
@@ -164,12 +152,6 @@ struct ScalarExprTypeHelper<float> {
 
 template <>
 struct ScalarExprTypeHelper<DualFloat> {
-  using type = DualFloat;
-};
-
-
-template <>
-struct ScalarExprTypeHelper<DualFloat&> {
   using type = DualFloat;
 };
 
@@ -190,7 +172,7 @@ template <
   typename B = ScalarExprType<BExpr>
 >
 ScalarExpr<ScalarAdd<A,B>>
-  operator+(AExpr &&a,BExpr &&b)
+  operator+(const AExpr &a,const BExpr &b)
 {
   return {{internal(a),internal(b)}};
 }
@@ -210,7 +192,7 @@ template <
   typename B=ScalarExprType<BExpr>
 >
 ScalarExpr<ScalarSub<A,B>>
-  operator-(AExpr &&a,BExpr &&b)
+  operator-(const AExpr &a,const BExpr &b)
 {
   return {{internal(a),internal(b)}};
 }
@@ -230,7 +212,7 @@ template <
   typename B=ScalarExprType<BExpr>
 >
 ScalarExpr<ScalarMul<A,B>>
-  operator*(AExpr &&a,BExpr &&b)
+  operator*(const AExpr &a,const BExpr &b)
 {
   return {{internal(a),internal(b)}};
 }
@@ -249,7 +231,7 @@ template <
   typename A=ScalarExprType<AExpr>,
   typename B=ScalarExprType<BExpr>
 >
-ScalarExpr<ScalarDiv<A,B>> operator/(AExpr &&a,BExpr &&b)
+ScalarExpr<ScalarDiv<A,B>> operator/(const AExpr &a,const BExpr &b)
 {
   return {{internal(a),internal(b)}};
 }
@@ -262,7 +244,7 @@ struct Cos {
 
 
 template <typename AExpr,typename A=ScalarExprType<AExpr>>
-inline ScalarExpr<Cos<A>> cos(AExpr &&a)
+inline ScalarExpr<Cos<A>> cos(const AExpr &a)
 {
   return {{internal(a)}};
 }
@@ -293,7 +275,7 @@ struct Sin {
 
 
 template <typename AExpr,typename A=ScalarExprType<AExpr>>
-ScalarExpr<Sin<A>> sin(AExpr &&a)
+ScalarExpr<Sin<A>> sin(const AExpr &a)
 {
   return {{internal(a)}};
 }
@@ -458,7 +440,7 @@ struct Evaluator<Sqrt<X>> {
 
 
 template <typename XExpr,typename X=ScalarExprType<XExpr>>
-ScalarExpr<Sqrt<X>> sqrt(XExpr &&x)
+ScalarExpr<Sqrt<X>> sqrt(const XExpr &x)
 {
   return {{internal(x)}};
 }

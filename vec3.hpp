@@ -45,7 +45,7 @@ auto genDot(const A& a,const B& b)
 
 
 template <typename T>
-auto dot(const Vec3<T> &a,const Vec3<T> &b)
+T dot(const Vec3<T> &a,const Vec3<T> &b)
 {
   return genDot(a,b);
 }
@@ -69,7 +69,7 @@ inline Vec3<float> vec3(int x,int y,int z)
 }
 
 
-Vec3<float> operator-(const Vec3<float> &a,const Vec3<float> &b)
+inline Vec3<float> operator-(const Vec3<float> &a,const Vec3<float> &b)
 {
   return {a.x() - b.x(), a.y() - b.y(), a.z() - b.z()};
 }

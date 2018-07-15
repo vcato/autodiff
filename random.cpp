@@ -24,9 +24,13 @@ RandomEngine::~RandomEngine()
 }
 
 
-float randomFloat(float low,float high,RandomEngine &random_engine)
+template <typename T>
+T random(T low,T high,RandomEngine &random_engine)
 {
   std::mt19937 &std_engine = random_engine.impl().std_engine;
 
-  return std::uniform_real_distribution<float>(low,high)(std_engine);
+  return std::uniform_real_distribution<T>(low,high)(std_engine);
 }
+
+
+template float random<float>(float,float,RandomEngine &);

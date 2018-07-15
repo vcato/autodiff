@@ -1,5 +1,11 @@
 CXXFLAGS=-O2 -g -W -Wall -pedantic -std=c++14 -MD -MP
 
+all: perf_test_disassembly.txt benchmark
+
+
+benchmark: benchmark.o dqrdecomposed.o ../random.o
+	$(CXX) -o $@ $^
+
 perf_test_disassembly.txt: perf_test.o
 	#objdump -S --disassemble $^ >$@
 	#$(CXX) $(CXXFLAGS) -S -fverbose-asm -Wa,-adhln perf_test.cpp

@@ -1,6 +1,11 @@
+#ifndef AUTODIFF_MAT33EXPR_HPP
+#define AUTODIFF_MAT33EXPR_HPP
+
+
 #include <cassert>
 #include "dualmat33.hpp"
 #include "scalarexpr.hpp"
+#include "vec3expr.hpp"
 #include "evaluator.hpp"
 #include "mat33.hpp"
 
@@ -190,7 +195,7 @@ template <typename M>
 struct Mat33ExprVar {
   Evaluator<M> eval;
   FloatMat33 _value = eval.value();
-  mutable FloatMat33 deriv = zeroMat33();
+  mutable FloatMat33 deriv = zeroMat33<float>();
 
   FloatMat33 value() const { return _value; }
   void addDeriv(const FloatMat33 &dvalue) { deriv += dvalue; }
@@ -677,7 +682,7 @@ struct Evaluator<Mat33Element<M>> {
 
   void addDeriv(float dvalue)
   {
-    FloatMat33 dm = zeroMat33();
+    FloatMat33 dm = zeroMat33<float>();
     dm[i][j] = dvalue;
 
     m_eval.addDeriv(dm);
@@ -718,7 +723,7 @@ struct Evaluator<Vec3FromCol<M>> {
 
   void addDeriv(const FloatVec3 &deriv)
   {
-    FloatMat33 dm = zeroMat33();
+    FloatMat33 dm = zeroMat33<float>();
     dm[0][j] = deriv.x();
     dm[1][j] = deriv.y();
     dm[2][j] = deriv.z();
@@ -728,3 +733,6 @@ struct Evaluator<Vec3FromCol<M>> {
 
 
 }
+
+
+#endif /* AUTODIFF_MAT33EXPR_HPP */

@@ -1,6 +1,11 @@
 #include "../vec3expr.hpp"
 #include "../mat33expr.hpp"
+#include "../evalandaddderiv.hpp"
 
+
+using autodiff::dual;
+using autodiff::vec3;
+using autodiff::evalAndAddDeriv;
 
 #if 0
 void
@@ -32,8 +37,8 @@ void
 #if 1
 void testFunction(float &dv)
 {
-  auto a = vec3(expr(2),expr(3,dv),expr(4));
-  auto b = vec3(expr(5),expr(6),   expr(7));
+  auto a = vec3(2,dual(3,dv),4);
+  auto b = vec3(5,6,7);
   evalAndAddDeriv(dot(a,b),1);
 }
 #endif

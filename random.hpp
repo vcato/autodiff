@@ -17,7 +17,8 @@ struct RandomEngine {
 };
 
 
-extern float randomFloat(float low,float high,RandomEngine &random_engine);
+template <typename T>
+extern T random(T low,T high,RandomEngine &random_engine);
 
 
 #endif /* RANDOM_HPP */

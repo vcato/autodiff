@@ -14,6 +14,8 @@
 #include "evalandaddderiv.hpp"
 #include "qrdecomposition.hpp"
 #include "qrdecomposedexpr.hpp"
+#include "randommat33.hpp"
+
 
 #define assertNear(actual,expected,tolerance) \
   (assertNearHelper(actual,expected,tolerance,__FILE__,__LINE__))
@@ -42,6 +44,30 @@ using autodiff::Mat33ExprVar;
 using autodiff::Evaluator;
 
 
+
+static float randomFloat(float low,float high,RandomEngine &random_engine)
+{
+  return random<float>(low,high,random_engine);
+}
+
+
+static FloatVec3 randomVec3(RandomEngine &random_engine)
+{
+  return randomVec3<float>(random_engine);
+}
+
+
+
+static FloatMat33 randomMat33(RandomEngine &random_engine)
+{
+  return randomMat33<float>(random_engine);
+}
+
+
+static FloatMat33 zeroMat33()
+{
+  return zeroMat33<float>();
+}
 
 
 static QRDecomposition<float> qrDecomposed(const Mat33<float> &a)
@@ -211,32 +237,6 @@ static T
   return max(differenceBetween(a.q,b.q),differenceBetween(a.r,b.r));
 }
 
-
-
-static FloatVec3 randomVec3(RandomEngine &random_engine)
-{
-  float x = randomFloat(-1,1,random_engine);
-  float y = randomFloat(-1,1,random_engine);
-  float z = randomFloat(-1,1,random_engine);
-
-  return FloatVec3{x,y,z};
-}
-
-
-static FloatMat33 randomMat33(RandomEngine &random_engine)
-{
-  FloatVec3 x = randomVec3(random_engine);
-  FloatVec3 y = randomVec3(random_engine);
-  FloatVec3 z = randomVec3(random_engine);
-
-  float values[3][3] = {
-    {x.x(), x.y(), x.z()},
-    {y.x(), y.y(), y.z()},
-    {z.x(), z.y(), z.z()},
-  };
-
-  return FloatMat33(values);
-}
 
 
 template <typename Function>
@@ -706,7 +706,7 @@ static void testDotEvaluator()
     FloatVec3 da{0,0,0};
     FloatVec3 db{0,0,0};
 
-    auto e = dot(dual(a,da),dual(b,db));
+    auto e = genDot(dual(a,da),dual(b,db));
     float dresult = 1;
     float result = evalAndAddDeriv(e,dresult);
     auto f = [&]{ return dot(a,b); };

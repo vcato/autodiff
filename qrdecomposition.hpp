@@ -1,3 +1,10 @@
+#ifndef AUTODIFF_QRDECOMPOSITION_HPP_
+#define AUTODIFF_QRDECOMPOSITION_HPP_
+
+
+#include "mat33.hpp"
+
+
 namespace autodiff {
 
 
@@ -20,3 +27,6 @@ std::ostream& operator<<(std::ostream &stream,const QRDecomposition<T> &qr)
 
 
 }
+
+
+#endif /* AUTODIFF_QRDECOMPOSITION_HPP_ */

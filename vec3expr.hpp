@@ -1,3 +1,8 @@
+#ifndef AUTODIFF_VEC3EXPR_HPP
+#define AUTODIFF_VEC3EXPR_HPP
+
+
+
 #include "dualvec3.hpp"
 #include "scalarexpr.hpp"
 
@@ -490,3 +495,6 @@ Vec3Expr<Vec3Div<A,B>> operator/(const AExpr &a,const BExpr& b)
 
 
 }
+
+
+#endif /* AUTODIFF_VEC3EXPR_HPP */

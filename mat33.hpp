@@ -59,6 +59,16 @@ struct Mat33 {
   {
   }
 
+  template <typename U>
+  Mat33(const Mat33<U> &arg)
+  {
+    for (int i=0; i!=3; ++i) {
+      for (int j=0; j!=3; ++j) {
+        values[i][j] = arg[i][j];
+      }
+    }
+  }
+
   Mat33 &operator+=(Mat33 arg)
   {
     for (int i=0; i!=3; ++i) {
@@ -173,21 +183,23 @@ Mat33<T> mat33(const T (&values)[3][3])
 }
 
 
-inline FloatMat33 mat33All(float arg)
+template <typename T>
+inline Mat33<T> mat33All(T arg)
 {
-  float values[3][3] = {
+  T values[3][3] = {
     {arg,arg,arg},
     {arg,arg,arg},
     {arg,arg,arg},
   };
 
-  return FloatMat33(values);
+  return Mat33<T>(values);
 }
 
 
-inline FloatMat33 zeroMat33()
+template <typename T>
+inline Mat33<T> zeroMat33()
 {
-  return mat33All(0);
+  return mat33All<T>(0);
 }
 
 

@@ -1,3 +1,7 @@
+#include "mat33.hpp"
+#include "mat33expr.hpp"
+
+
 namespace autodiff {
 
 
@@ -125,7 +129,7 @@ struct Evaluator<QRDecomposed<A>> {
       {          0,          0,r33.value()}
     };
 
-    return {q.value(),r_values};
+    return {q.value(),Mat33<float>(r_values)};
   }
 
   void addDeriv(const QRDecomposition<float> &deriv)

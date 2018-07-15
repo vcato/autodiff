@@ -370,12 +370,6 @@ struct Evaluator<QRDecomposed<A>> {
   // q3 = u3/r33
   ExprVar<decltype(u3/r33)> q3 = u3/r33;
 
-  float r_values[3][3] = {
-    {r11.value(),r12.value(),r13.value()},
-    {          0,r22.value(),r23.value()},
-    {          0,          0,r33.value()}
-  };
-
   ExprVar<decltype(columns(q1,q2,q3))> q = columns(q1,q2,q3);
 
   Evaluator(const QRDecomposed<A> &expr)
@@ -385,6 +379,12 @@ struct Evaluator<QRDecomposed<A>> {
 
   QRDecomposition<float> value() const
   {
+    float r_values[3][3] = {
+      {r11.value(),r12.value(),r13.value()},
+      {          0,r22.value(),r23.value()},
+      {          0,          0,r33.value()}
+    };
+
     return {q.value(),r_values};
   }
 

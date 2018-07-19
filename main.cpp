@@ -40,6 +40,7 @@ using autodiff::DualMat33;
 using autodiff::ColRef;
 using autodiff::vec3;
 using autodiff::rotX;
+using autodiff::ScalarExprVar;
 using autodiff::Vec3ExprVar;
 using autodiff::Mat33ExprVar;
 using autodiff::Evaluator;
@@ -875,6 +876,54 @@ static void testDistanceGradient()
 }
 
 
+static void testDistanceGradient2()
+{
+  RandomEngine random_engine(/*seed*/1);
+  std::vector<float> params;
+
+  for (int i=0; i!=6; ++i) {
+    params.push_back(randomFloat(-1,1,random_engine));
+  }
+
+  std::vector<float> gradient(params.size(),0);
+  std::vector<DualFloat> dual_params;
+
+  for (int i=0; i!=6; ++i) {
+    dual_params.push_back(dual(params[i],gradient[i]));
+  }
+
+  float eval_result = [&]{
+    auto &p = dual_params;
+    Vec3ExprVar<decltype(vec3(p[0],p[1],p[2]))> a = vec3(p[0],p[1],p[2]);
+    Vec3ExprVar<decltype(vec3(p[3],p[4],p[5]))> b = vec3(p[3],p[4],p[5]);
+    Vec3ExprVar<decltype(a-b)> delta = a-b;
+    ScalarExprVar<decltype(sqrt(dot(delta,delta)))> result =
+      sqrt(dot(delta,delta));
+    float eval_result = result.value();
+    result.addDeriv(1);
+    return eval_result;
+  }();
+
+  auto f = [&]{
+    auto a = vec3(params[0],params[1],params[2]);
+    auto b = vec3(params[3],params[4],params[5]);
+    auto delta = a-b;
+    auto result = sqrt(dot(delta,delta));
+    return result;
+  };
+
+  float f_result = f();
+
+  assertNear(eval_result,f_result,0);
+
+  for (int i=0; i!=6; ++i) {
+    float fd = finiteDeriv(f,params[i]);
+    assertNear(gradient[i],fd,1e-4);
+  }
+}
+
+
+
 static void testExprVar1()
 {
   RandomEngine random_engine(/*seed*/1);
@@ -987,6 +1036,7 @@ int main()
   tests::testRotXEvaluator();
   tests::testColumnsEvaluator();
   tests::testDistanceGradient();
+  tests::testDistanceGradient2();
 
   tests::testExprVar1();
   tests::testExprVar2();

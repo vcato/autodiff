@@ -205,6 +205,10 @@ struct Vec3ExprVar {
   {
   }
 
+  DualFloat x() const { return autodiff::dual(_value.x(),deriv.x()); }
+  DualFloat y() const { return autodiff::dual(_value.y(),deriv.y()); }
+  DualFloat z() const { return autodiff::dual(_value.z(),deriv.z()); }
+
   ~Vec3ExprVar()
   {
     eval.addDeriv(deriv);
@@ -241,6 +245,7 @@ template <typename A,typename B>
 struct Evaluator<Dot<A,B>> {
   Vec3ExprVar<A> a;
   Vec3ExprVar<B> b;
+  Evaluator<decltype(genDot(a,b).expr)> result = genDot(a,b).expr;
 
   Evaluator(const Dot<A,B> &expr)
   : a(expr.a),
@@ -248,11 +253,14 @@ struct Evaluator<Dot<A,B>> {
   {
   }
 
-  float value() const { return genDot(a.value(),b.value()); }
+  float value() const
+  {
+    return result.value();
+  }
 
   void addDeriv(float dresult)
   {
-    evalAndAddDeriv(genDot(expr(a),expr(b)),dresult);
+    result.addDeriv(dresult);
   }
 };
 

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <cfloat>
+#include <vector>
 #include "random.hpp"
 #include "vec3.hpp"
 #include "dualvec3.hpp"
@@ -840,6 +841,40 @@ static void testColumnsEvaluator()
 }
 
 
+static void testDistanceGradient()
+{
+  RandomEngine random_engine(/*seed*/1);
+  std::vector<float> params;
+
+  for (int i=0; i!=6; ++i) {
+    params.push_back(randomFloat(-1,1,random_engine));
+  }
+
+  std::vector<float> gradient(params.size(),0);
+  std::vector<DualFloat> dual_params;
+
+  for (int i=0; i!=6; ++i) {
+    dual_params.push_back(dual(params[i],gradient[i]));
+  }
+
+  auto f = [&](const auto &params)
+  {
+    auto a = vec3(params[0],params[1],params[2]);
+    auto b = vec3(params[3],params[4],params[5]);
+    using std::sqrt;
+    return sqrt(dot(a-b,a-b));
+  };
+
+  float eval_result = evalAndAddDeriv(f(dual_params),1);
+  assertNear(eval_result,f(params),0);
+
+  for (int i=0; i!=6; ++i) {
+    float fd = finiteDeriv([&]{ return f(params); },params[i]);
+    assertNear(gradient[i],fd,1e-4);
+  }
+}
+
+
 static void testExprVar1()
 {
   RandomEngine random_engine(/*seed*/1);
@@ -951,6 +986,7 @@ int main()
   tests::testMat33InvEvaluator();
   tests::testRotXEvaluator();
   tests::testColumnsEvaluator();
+  tests::testDistanceGradient();
 
   tests::testExprVar1();
   tests::testExprVar2();

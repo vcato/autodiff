@@ -433,7 +433,10 @@ struct Evaluator<Sqrt<X>> {
   {
   }
 
-  float value() const { return sqrt_x; }
+  float value() const
+  {
+    return sqrt_x;
+  }
 
   void addDeriv(float dvalue)
   {

@@ -461,4 +461,9 @@ inline ScalarExpr<float> expr(float x)
 
 }
 
+
+#define SCALAR_VAR(name,value) \
+  autodiff::ScalarExprVar<decltype(value)> name = (value)
+
+
 #endif /* SCALAREXPR_HPP */

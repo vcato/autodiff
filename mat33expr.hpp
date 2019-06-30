@@ -735,4 +735,7 @@ struct Evaluator<Vec3FromCol<M>> {
 }
 
 
+#define MAT33_VAR(name,value) \
+  autodiff::Mat33ExprVar<decltype(value)> name = (value)
+
 #endif /* AUTODIFF_MAT33EXPR_HPP */

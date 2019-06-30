@@ -505,4 +505,8 @@ Vec3Expr<Vec3Div<A,B>> operator/(const AExpr &a,const BExpr& b)
 }
 
 
+#define VEC3_VAR(name,value) \
+  autodiff::Vec3ExprVar<decltype(value)> name = (value)
+
+
 #endif /* AUTODIFF_VEC3EXPR_HPP */

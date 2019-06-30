@@ -40,9 +40,6 @@ using autodiff::DualMat33;
 using autodiff::ColRef;
 using autodiff::vec3;
 using autodiff::rotX;
-using autodiff::ScalarExprVar;
-using autodiff::Vec3ExprVar;
-using autodiff::Mat33ExprVar;
 using autodiff::Evaluator;
 
 
@@ -894,11 +891,10 @@ static void testDistanceGradient2()
 
   float eval_result = [&]{
     auto &p = dual_params;
-    Vec3ExprVar<decltype(vec3(p[0],p[1],p[2]))> a = vec3(p[0],p[1],p[2]);
-    Vec3ExprVar<decltype(vec3(p[3],p[4],p[5]))> b = vec3(p[3],p[4],p[5]);
-    Vec3ExprVar<decltype(a-b)> delta = a-b;
-    ScalarExprVar<decltype(sqrt(dot(delta,delta)))> result =
-      sqrt(dot(delta,delta));
+    VEC3_VAR(a, vec3(p[0],p[1],p[2]));
+    VEC3_VAR(b, vec3(p[3],p[4],p[5]));
+    VEC3_VAR(delta, a-b);
+    SCALAR_VAR(result, sqrt(dot(delta,delta)));
     float eval_result = result.value();
     result.addDeriv(1);
     return eval_result;
@@ -929,7 +925,7 @@ static void testExprVar1()
   RandomEngine random_engine(/*seed*/1);
   FloatMat33 a = randomMat33(random_engine);
   FloatMat33 da = zeroMat33();
-  Mat33ExprVar<DualMat33> a_var(dual(a,da));
+  MAT33_VAR(a_var, dual(a,da));
   FloatMat33 dresult = randomMat33(random_engine);
   FloatMat33 result = evalAndAddDeriv(a_var,dresult);
   assertNear(result,a,0);
@@ -945,7 +941,7 @@ static void testExprVar2()
   FloatVec3 da{0,0,0};
   FloatVec3 dresult = randomVec3(random_engine);
   {
-    Vec3ExprVar<DualVec3> a_var(dual(a,da));
+    VEC3_VAR(a_var, dual(a,da));
     Evaluator<DualVec3> eval(a_var.dual());
     eval.addDeriv(dresult);
   }
@@ -962,8 +958,8 @@ static void testExprVar3()
   FloatVec3 dresult = randomVec3(random_engine);
 
   {
-    Mat33ExprVar<DualMat33> a_var(dual(a,da));
-    Vec3ExprVar<decltype(vec3(col(a_var,0)))> a1(vec3(col(a_var,0)));
+    MAT33_VAR(a_var, dual(a,da));
+    VEC3_VAR(a1,vec3(col(a_var,0)));
     FloatVec3 result = evalAndAddDeriv(a1,dresult);
     assertNear(result,vec3(col(a,0)),0);
   }

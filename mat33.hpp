@@ -217,7 +217,7 @@ auto genMat33Div(const A& a,const B& b)
 
 
 template <typename Mat>
-auto genCofactor(const Mat &arg,int i,int j)
+auto genCofactor33(const Mat &arg,int i,int j)
 {
   auto a11 = arg[(i+1)%3][(j+1)%3];
   auto a12 = arg[(i+1)%3][(j+2)%3];
@@ -230,19 +230,19 @@ auto genCofactor(const Mat &arg,int i,int j)
 
 inline float cofactor(const FloatMat33 &arg,int i,int j)
 {
-  return genCofactor(arg,i,j);
+  return genCofactor33(arg,i,j);
 }
 
 
 template <typename Mat>
 auto genCofactorMatrix(const Mat &arg)
 {
-  using V = decltype(genCofactor(arg,0,0));
+  using V = decltype(genCofactor33(arg,0,0));
 
   V values[3][3] = {
-    {genCofactor(arg,0,0),genCofactor(arg,0,1),genCofactor(arg,0,2)},
-    {genCofactor(arg,1,0),genCofactor(arg,1,1),genCofactor(arg,1,2)},
-    {genCofactor(arg,2,0),genCofactor(arg,2,1),genCofactor(arg,2,2)},
+    {genCofactor33(arg,0,0),genCofactor33(arg,0,1),genCofactor33(arg,0,2)},
+    {genCofactor33(arg,1,0),genCofactor33(arg,1,1),genCofactor33(arg,1,2)},
+    {genCofactor33(arg,2,0),genCofactor33(arg,2,1),genCofactor33(arg,2,2)},
   };
 
   return mat33(values);
@@ -256,18 +256,18 @@ inline auto cofactorMatrix(const FloatMat33 &arg)
 
 
 template <typename Mat>
-auto genDeterminant(const Mat &a)
+auto genDeterminant33(const Mat &a)
 {
   return
-    a[0][0] * genCofactor(a,0,0) +
-    a[0][1] * genCofactor(a,0,1) +
-    a[0][2] * genCofactor(a,0,2);
+    a[0][0] * genCofactor33(a,0,0) +
+    a[0][1] * genCofactor33(a,0,1) +
+    a[0][2] * genCofactor33(a,0,2);
 }
 
 
 inline auto determinant(const FloatMat33 &a)
 {
-  return genDeterminant(a);
+  return genDeterminant33(a);
 }
 
 

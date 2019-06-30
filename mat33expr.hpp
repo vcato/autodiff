@@ -359,11 +359,11 @@ ScalarExpr<Cofactor<M>> cofactor(const MExpr &arg,int i,int j)
 template <typename M>
 struct Evaluator<Cofactor<M>> {
   Mat33ExprVar<M> m;
-  Evaluator<decltype(genCofactor(expr(m),0,0).expr)> result;
+  Evaluator<decltype(genCofactor33(expr(m),0,0).expr)> result;
 
   Evaluator(const Cofactor<M> &c)
   : m{c.m},
-    result{genCofactor(expr(m),c.i,c.j).expr}
+    result{genCofactor33(expr(m),c.i,c.j).expr}
   {
   }
 
@@ -486,8 +486,8 @@ ScalarExpr<Determinant<M>> determinant(const MExpr &m)
 template <typename M>
 struct Evaluator<Determinant<M>> {
   Mat33ExprVar<M> m;
-  Evaluator<decltype(genDeterminant(expr(m)).expr)>
-    result{genDeterminant(expr(m)).expr};
+  Evaluator<decltype(genDeterminant33(expr(m)).expr)>
+    result{genDeterminant33(expr(m)).expr};
 
   Evaluator(const Determinant<M> &expr)
   : m(expr.m)

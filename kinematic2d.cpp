@@ -32,8 +32,8 @@ struct Rot {
 template <typename Angle>
 struct autodiff::Evaluator<Rot<Angle>> {
   ScalarExprVar<Angle> angle;
-  SCALAR_VAR(cos_angle,cos(angle));
-  SCALAR_VAR(sin_angle,sin(angle));
+  SCALAR_VAR(          cos_angle,  cos(angle));
+  SCALAR_VAR(          sin_angle,  sin(angle));
 
   Evaluator(Rot<Angle> arg)
   : angle(arg.angle)
@@ -174,12 +174,12 @@ template <typename Rot1,typename Rot2>
 struct autodiff::Evaluator<Error<Rot1,Rot2>> {
   ScalarExprVar<Rot1> rot1;
   ScalarExprVar<Rot2> rot2;
-  MAT33_VAR(body1_transform,rot(rot1));
-  MAT33_VAR(body2_transform,body1_transform*transX(10)*rot(rot2));
-  VEC3_VAR(local,vec3(20,0,1));
-  VEC3_VAR(global,vec3(25,0,1));
-  VEC3_VAR(predicted,body2_transform*local);
-  SCALAR_VAR(result,mag2(predicted-global));
+  MAT33_VAR(          body1_transform, rot(rot1)                            );
+  MAT33_VAR(          body2_transform, body1_transform*transX(10)*rot(rot2) );
+  VEC3_VAR(           local          , vec3(20,0,1)                         );
+  VEC3_VAR(           global         , vec3(25,0,1)                         );
+  VEC3_VAR(           predicted      , body2_transform*local                );
+  SCALAR_VAR(         result         , mag2(predicted-global                ));
 
   Evaluator(Error<Rot1,Rot2> arg)
   : rot1(arg.rot1),

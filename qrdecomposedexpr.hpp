@@ -11,6 +11,14 @@ struct QRDecomposed {
 };
 
 
+template <typename T>
+T differenceBetween(const QRDecomposition<T> &a,const QRDecomposition<T> &b)
+{
+  return std::max(differenceBetween(a.q,b.q),differenceBetween(a.r,b.r));
+}
+
+
+
 template <typename AExpr,typename A=Mat33ExprType<AExpr>>
 Mat33Expr<QRDecomposed<A>> qrDecomposed(const AExpr &a)
 {

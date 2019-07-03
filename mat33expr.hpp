@@ -42,6 +42,12 @@ struct Mat33ExprTypeHelper<DualMat33> {
 };
 
 
+template <>
+struct Mat33ExprTypeHelper<FloatMat33>  {
+  using type = FloatMat33;
+};
+
+
 template <typename T>
 struct DVar {
   T value;
@@ -730,6 +736,72 @@ struct Evaluator<Vec3FromCol<M>> {
     m_eval.addDeriv(dm);
   }
 };
+
+
+template <typename A,typename B>
+struct Mat33VecMul {
+  A a;
+  B b;
+};
+
+
+template <typename A,typename B>
+struct autodiff::Evaluator<Mat33VecMul<A,B>> {
+  Evaluator<A> a_eval;
+  FloatMat33 a;
+  Evaluator<B> b_eval;
+  FloatVec3 b;
+
+  Evaluator(const Mat33VecMul<A,B> &expr)
+  : a_eval(expr.a),
+    a(a_eval.value()),
+    b_eval(expr.b),
+    b(b_eval.value())
+  {
+  }
+
+  FloatVec3 value() const
+  {
+    return a*b;
+  }
+
+  void addDeriv(const FloatVec3 &dvalue)
+  {
+    // It would be nice to have this work:
+    // a_eval.addDeriv(dvalue*transpose(b));
+    // This needs to be an outer product.  We don't have transpose(Vector)
+    // working yet. I suppose we would need to create a Mat13, or a 
+    // RowVector type for that.
+
+    const float vx = dvalue.x();
+    const float vy = dvalue.y();
+    const float vz = dvalue.z();
+    const float bx = b.x();
+    const float by = b.y();
+    const float bz = b.z();
+
+    const float da[3][3] = {
+      {vx*bx, vx*by, vx*bz},
+      {vy*bx, vy*by, vy*bz},
+      {vz*bx, vz*by, vz*bz},
+    };
+
+    a_eval.addDeriv(da);
+    b_eval.addDeriv(transpose(a)*dvalue);
+  }
+};
+
+
+template <
+  typename AExpr,
+  typename BExpr,
+  typename A=Mat33ExprType<AExpr>,
+  typename B=Vec3ExprType<BExpr>
+>
+Vec3Expr<Mat33VecMul<A,B>> operator*(const AExpr &a,const BExpr &b)
+{
+  return {{internal(a),internal(b)}};
+}
 
 
 }

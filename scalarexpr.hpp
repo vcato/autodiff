@@ -18,6 +18,12 @@ struct ScalarExpr {
 };
 
 
+template <typename M>
+struct Evaluator<ScalarExpr<M>> : Evaluator<M> {
+  Evaluator(const ScalarExpr<M> &m) : Evaluator<M>(m.expr) {}
+};
+
+
 inline ScalarExpr<DualFloat> expr(float value,float &deriv)
 {
   return {{value,deriv}};
@@ -194,10 +200,24 @@ template <
   typename A=ScalarExprType<AExpr>,
   typename B=ScalarExprType<BExpr>
 >
-ScalarExpr<ScalarSub<A,B>>
-  operator-(const AExpr &a,const BExpr &b)
+ScalarExpr<ScalarSub<A,B>> operator-(const AExpr &a,const BExpr &b)
 {
   return {{internal(a),internal(b)}};
+}
+
+
+template <typename Arg>
+struct ScalarNeg {
+};
+
+
+template <
+  typename ArgExpr,
+  typename Arg = ScalarExprType<ArgExpr>
+>
+ScalarExpr<ScalarNeg<Arg>> operator-(const ArgExpr &arg)
+{
+  return {{internal(arg)}};
 }
 
 

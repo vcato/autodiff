@@ -4,7 +4,9 @@
 #include <iostream>
 #include <cassert>
 #include <cmath>
+#include <float.h>
 #include "vec3.hpp"
+#include "differencebetween.hpp"
 
 
 namespace autodiff {
@@ -344,6 +346,30 @@ inline Mat33<T> columns(const Vec3<T> &c1,const Vec3<T> &c2,const Vec3<T> &c3)
   };
 
   return {values};
+}
+
+
+inline float differenceBetween(const FloatMat33 &a,const FloatMat33 &b)
+{
+  float max_d = -FLT_MAX;
+
+  for (int i=0; i!=3; ++i) {
+    for (int j=0; j!=3; ++j) {
+      float d = ::differenceBetween(a.values[i][j], b.values[i][j]);
+      max_d = std::max(max_d,d);
+    }
+  }
+
+  return max_d;
+}
+
+
+inline FloatVec3 operator*(const FloatMat33 &m,const FloatVec3 &v)
+{
+  float x =  m[0][0]*v.x() + m[0][1]*v.y() + m[0][2] * v.z();
+  float y =  m[1][0]*v.x() + m[1][1]*v.y() + m[1][2] * v.z();
+  float z =  m[2][0]*v.x() + m[2][1]*v.y() + m[2][2] * v.z();
+  return FloatVec3(x,y,z);
 }
 
 

@@ -16,10 +16,9 @@
 #include "qrdecomposition.hpp"
 #include "qrdecomposedexpr.hpp"
 #include "randommat33.hpp"
-
-
-#define assertNear(actual,expected,tolerance) \
-  (assertNearHelper(actual,expected,tolerance,__FILE__,__LINE__))
+#include "finitederivfloat.hpp"
+#include "finitederivvec3.hpp"
+#include "assertnear.hpp"
 
 
 using std::cerr;
@@ -192,77 +191,6 @@ static float weightedSum(const FloatMat33 &m,const FloatMat33 &w)
 }
 
 
-static float max(float a,float b,float c)
-{
-  return std::max(std::max(a,b),c);
-}
-
-
-static float differenceBetween(float a,float b)
-{
-  return fabsf(a-b);
-}
-
-
-static float differenceBetween(const FloatVec3 &a,const FloatVec3 &b)
-{
-  float dx = differenceBetween(a.x(), b.x());
-  float dy = differenceBetween(a.y(), b.y());
-  float dz = differenceBetween(a.z(), b.z());
-
-  return max(dx,dy,dz);
-}
-
-
-static float differenceBetween(const FloatMat33 &a,const FloatMat33 &b)
-{
-  float max_d = -FLT_MAX;
-
-  for (int i=0; i!=3; ++i) {
-    for (int j=0; j!=3; ++j) {
-      float d = differenceBetween(a.values[i][j],b.values[i][j]);
-      max_d = max(max_d,d);
-    }
-  }
-
-  return max_d;
-}
-
-
-template <typename T>
-static T
-  differenceBetween(const QRDecomposition<T> &a,const QRDecomposition<T> &b)
-{
-  return max(differenceBetween(a.q,b.q),differenceBetween(a.r,b.r));
-}
-
-
-
-template <typename Function>
-static float finiteDeriv(Function f,float &v)
-{
-  float h = 1e-3;
-  float old_value = v;
-  v = old_value - h;
-  float value1 = f();
-  v = old_value + h;
-  float value2 = f();
-  v = old_value;
-  return (value2-value1)/(2*h);
-}
-
-
-template <typename Function>
-static FloatVec3 finiteDeriv(Function f,FloatVec3 &v)
-{
-  float x = finiteDeriv(f,v.x());
-  float y = finiteDeriv(f,v.y());
-  float z = finiteDeriv(f,v.z());
-
-  return {x,y,z};
-}
-
-
 template <typename Function>
 static FloatMat33 finiteDeriv(Function f,FloatMat33 &m)
 {
@@ -277,32 +205,6 @@ static FloatMat33 finiteDeriv(Function f,FloatMat33 &m)
   return result;
 }
 
-
-
-template <typename T>
-static void
-  assertNearHelper(
-    const T& actual,
-    const T& expected,
-    float tolerance,
-    const char *file,
-    int line
-  )
-{
-  float delta = differenceBetween(actual,expected);
-
-  if (delta<=tolerance) {
-    return;
-  }
-
-  cerr << "file: " << file << "\n";
-  cerr << "line: " << line << "\n";
-  cerr << "actual: " << actual << "\n";
-  cerr << "expected: " << expected << "\n";
-  cerr << "delta: " << delta << "\n";
-  cerr << "tolerance: " << tolerance << "\n";
-  assert(false);
-}
 
 
 namespace tests {
@@ -438,8 +340,8 @@ static void testScalarDivEvaluator()
   float result = evalAndAddDeriv(dual(a,da) / dual(b,db),dresult);
   auto f = [&]{ return a/b; };
 
-  assertNear(da,finiteDeriv(f,a),1e-4);
-  assertNear(db,finiteDeriv(f,b),1e-4);
+  assertNear(da, finiteDeriv(f,a), 1e-4);
+  assertNear(db, finiteDeriv(f,b), 1e-4);
   assert(result==a/b);
 }
 
@@ -919,6 +821,32 @@ static void testDistanceGradient2()
 }
 
 
+static FloatMat33 identityMat33()
+{
+  float values[3][3] = {
+    {1,0,0},
+    {0,1,0},
+    {0,0,1}
+  };
+
+  return values;
+}
+
+
+static void testMuliplyingByAConstantMatrix()
+{
+  // Testing muptilying a Mat33 expression by a constant Mat33.
+  float da = 0;
+  DualFloat a{10,da};
+  MAT33_VAR(b,rotX(a));
+  FloatMat33 c = identityMat33();
+  auto result = b*c;
+  FloatMat33 dresult = identityMat33();
+  evalAndAddDeriv(result,dresult);
+
+  // Just testing that this compiles so far.
+}
+
 
 static void testExprVar1()
 {
@@ -1033,6 +961,7 @@ int main()
   tests::testColumnsEvaluator();
   tests::testDistanceGradient();
   tests::testDistanceGradient2();
+  tests::testMuliplyingByAConstantMatrix();
 
   tests::testExprVar1();
   tests::testExprVar2();

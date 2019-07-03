@@ -3,6 +3,8 @@
 
 
 #include <iostream>
+#include "differencebetween.hpp"
+#include "max3.hpp"
 
 
 namespace autodiff {
@@ -108,6 +110,16 @@ T mag(const Vec3<T> &v)
 
 
 using FloatVec3 = Vec3<float>;
+
+
+inline float differenceBetween(const FloatVec3 &a,const FloatVec3 &b)
+{
+  float dx = ::differenceBetween(a.x(), b.x());
+  float dy = ::differenceBetween(a.y(), b.y());
+  float dz = ::differenceBetween(a.z(), b.z());
+
+  return max(dx,dy,dz);
+}
 
 
 }

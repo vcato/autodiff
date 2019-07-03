@@ -216,6 +216,13 @@ struct Vec3ExprVar {
 };
 
 
+template <typename T>
+DualVec3 internal(const Vec3ExprVar<T> &v)
+{
+  return v.dual();
+}
+
+
 template <typename M>
 struct Vec3ExprVar<Vec3Expr<M>> : Vec3ExprVar<M> {
   Vec3ExprVar(const Vec3Expr<M> &arg) : Vec3ExprVar<M>(arg.expr) { }

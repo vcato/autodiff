@@ -179,7 +179,7 @@ struct autodiff::Evaluator<Error<Rot1,Rot2>> {
   VEC3_VAR(           local          , vec3(20,0,1)                         );
   VEC3_VAR(           global         , vec3(25,0,1)                         );
   VEC3_VAR(           predicted      , body2_transform*local                );
-  SCALAR_VAR(         result         , mag2(predicted-global                ));
+  SCALAR_VAR(         result         , mag2(predicted-global)               );
 
   Evaluator(Error<Rot1,Rot2> arg)
   : rot1(arg.rot1),

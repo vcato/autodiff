@@ -1,4 +1,4 @@
-CXX=clang++
+CXX=g++
 CXXFLAGS=-W -Wall -pedantic -std=c++14 -MD -MP
 
 all: main.pass kinematic2d.pass

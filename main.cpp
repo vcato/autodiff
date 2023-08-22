@@ -905,7 +905,9 @@ static void testQRDecompositionEvaluator()
   FloatMat33 da = zeroMat33();
   FloatMat33 dq = randomMat33(random_engine);
   FloatMat33 dr = randomMat33(random_engine);
+
   QRDecomposition<float> dresult{dq,dr};
+
   QRDecomposition<float> result =
     evalAndAddDeriv(qrDecomposed(dual(a,da)),dresult);
 
@@ -916,8 +918,8 @@ static void testQRDecompositionEvaluator()
     return weightedSum(q,dq) + weightedSum(r,dr);
   };
 
-  assertNear(result,qrDecomposed(a),1e-4);
-  assertNear(da,finiteDeriv(f,a),2e-4);
+  assertNear(result, qrDecomposed(a), 1e-4);
+  assertNear(da, finiteDeriv(f,a), 2e-4);
 }
 
 }

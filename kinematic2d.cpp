@@ -129,7 +129,7 @@ struct Mag2 {
 
 namespace autodiff {
 template <typename V>
-struct autodiff::Evaluator<Mag2<V>> {
+struct Evaluator<Mag2<V>> {
   Vec3ExprVar<V> v;
   SCALAR_VAR(result,dot(v,v));
 
@@ -171,7 +171,7 @@ struct Error {
 
 namespace autodiff {
 template <typename Rot1,typename Rot2>
-struct autodiff::Evaluator<Error<Rot1,Rot2>> {
+struct Evaluator<Error<Rot1,Rot2>> {
   ScalarExprVar<Rot1> rot1;
   ScalarExprVar<Rot2> rot2;
   MAT33_VAR(          body1_transform, rot(rot1)                            );

@@ -746,7 +746,7 @@ struct Mat33VecMul {
 
 
 template <typename A,typename B>
-struct autodiff::Evaluator<Mat33VecMul<A,B>> {
+struct Evaluator<Mat33VecMul<A,B>> {
   Evaluator<A> a_eval;
   FloatMat33 a;
   Evaluator<B> b_eval;
